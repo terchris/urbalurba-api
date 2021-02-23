@@ -3007,12 +3007,19 @@ export async function getNetworkEntitytypeByEntitytypeIDandNetworkID(entitytypeI
 * update the relation between network and the entitytype
 returns the ID or "none" if failed
 */
-export async function updateNetworkEntitytype(networkEntitytypeID, networkEntitytypeText) {
+export async function updateNetworkEntitytype(networkEntitytypeID, currentMemberTypeRecord) {
 
   let response;
+
+  if (!currentMemberTypeRecord.displayName) currentMemberTypeRecord.displayName = "displayName missing";
+  if (!currentMemberTypeRecord.summary) currentMemberTypeRecord.summary = "";
+
+
   const myVariables = {
     "networkEntitytypeID": networkEntitytypeID,
-    "networkEntitytypeText": networkEntitytypeText
+    "networkEntitytypeText": currentMemberTypeRecord.displayName,
+    "networkEntitytypeDisplayName": currentMemberTypeRecord.displayName,
+    "networkEntitytypeSummary": currentMemberTypeRecord.summary
   };
 
   let ReturnID = "none"; //assume its not there
@@ -3190,13 +3197,20 @@ export async function createNetworkEntitytypeCategory(networkEntitytypeID, categ
  * returns the ID it gets from strapi or "none" if it fails
  * 
  */
-export async function createNetworkEntitytype(entitytypeID, networkID, networkEntitytypeCategoryTxt) {
+export async function createNetworkEntitytype(entitytypeID, networkID, currentMemberTypeRecord) {
 
   let response;
+
+  if (!currentMemberTypeRecord.displayName) currentMemberTypeRecord.displayName = "displayName missing";
+  if (!currentMemberTypeRecord.summary) currentMemberTypeRecord.summary = "";
+
+
   const myVariables = {
     "entitytypeID": entitytypeID,
     "networkID": networkID,
-    "networkEntitytypeCategoryTxt": networkEntitytypeCategoryTxt
+    "networkEntitytypeText": currentMemberTypeRecord.displayName,
+    "networkEntitytypeDisplayName": currentMemberTypeRecord.displayName,
+    "networkEntitytypeSummary": currentMemberTypeRecord.summary
   };
 
   let ReturnID = "none"; //assume its not there    

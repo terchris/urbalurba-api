@@ -7,20 +7,26 @@ const NETWORKENTITYTYPECREATE_MUTATION = gql`
 mutation NetworkEntitytypeCreate(
   $entitytypeID: ID!
   $networkID: ID!
-  $networkEntitytypeCategoryTxt: String
+  $networkEntitytypeText: String
+  $networkEntitytypeDisplayName: String
+  $networkEntitytypeSummary: String
 ) {
   createNetworkEntitytype(
     input:  {
       data: {
         entitytype: $entitytypeID
         network: $networkID
-        text: $networkEntitytypeCategoryTxt
+        displayName: $networkEntitytypeDisplayName
+        summary: $networkEntitytypeSummary
+        text: $networkEntitytypeText
       }
     }
   ) {
     networkEntitytype {
       id
       text
+      summary
+      displayName      
     }
   }
 }
@@ -33,10 +39,12 @@ export default NETWORKENTITYTYPECREATE_MUTATION;
 
 /* test data
 
- {
+{
     "entitytypeID": entitytypeID,
     "networkID": networkID,
-    "networkEntitytypeCategoryTxt": networkEntitytypeCategoryTxt
-  }
+    "networkEntitytypeText": "manually updated",
+    "networkEntitytypeDisplayName": "manually updated",
+    "networkEntitytypeSummary": "some text summary"
+}
 
 */

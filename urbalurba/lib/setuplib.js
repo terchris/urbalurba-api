@@ -293,11 +293,13 @@ The networkMemberTypes looks like this:
             {
                 "entityType": "organization",
                 "displayName": "Medlemskatagorier",
+                "summary": "Medlemmene i nettverket",
                 "categoryIdNames": ["sector","sdg", "industry", "challenge","tag" ]
             },
             {
                 "entityType": "solution",
                 "displayName": "Løsningskategorier",
+                "summary": "Løsninger fra medlemmene",
                 "categoryIdNames": ["sdg","industry", "challenge","tag", "impact", "result"]
             }
         ]
@@ -322,7 +324,7 @@ async function copyNetworkEntitytypes(importNetworkRecord, networkID) {
             currentNetworkEntitytypeID = await getNetworkEntitytypeByEntitytypeIDandNetworkID(currentEntitytypeID, networkID);
             if (currentNetworkEntitytypeID != "none") { //there is a relation
 
-                currentNetworkEntitytypeID = await updateNetworkEntitytype(currentNetworkEntitytypeID, currentMemberTypeRecord.displayName);
+                currentNetworkEntitytypeID = await updateNetworkEntitytype(currentNetworkEntitytypeID, currentMemberTypeRecord);
                 if (currentNetworkEntitytypeID != "none") { // update was sucessful 
                     console.log("...Updated Network entityType: ", currentMemberTypeRecord.entityType);
                     await copyNetworkEntitytypeCategory(currentNetworkEntitytypeID, currentMemberTypeRecord.categoryIdNames); //make the connection whit the categories
@@ -334,7 +336,7 @@ async function copyNetworkEntitytypes(importNetworkRecord, networkID) {
 
             } else { // there is no relation between the network and the entitytype - we need to create it
 
-                currentNetworkEntitytypeID = await createNetworkEntitytype(currentEntitytypeID, networkID, currentMemberTypeRecord.displayName);
+                currentNetworkEntitytypeID = await createNetworkEntitytype(currentEntitytypeID, networkID, currentMemberTypeRecord);
                 if (currentNetworkEntitytypeID != "none") { // create was sucessful 
                     console.log("...Created Network entityType: ", currentMemberTypeRecord.entityType);
                     await copyNetworkEntitytypeCategory(currentNetworkEntitytypeID, currentMemberTypeRecord.categoryIdNames); //make the connection whit the categories

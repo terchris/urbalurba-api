@@ -9,8 +9,6 @@ query EntityNetworkMembershipByEntityIDandNetworkID(
   entityNetworkMemberships(where: { entity: $entityID, network: $networkID }) {
     id
     text
-    displayName
-    summary
   }
 }
 
