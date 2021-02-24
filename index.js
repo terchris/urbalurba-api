@@ -1,6 +1,6 @@
 
 //export * from "./urbalurba/lib/algolialib.js"
-//export * from "./urbalurba/lib/apifylib.js";
+export * from "./urbalurba/lib/apifylib.js";
 export * from "./urbalurba/lib/brreglib.js";
 export * from "./urbalurba/lib/geonorgelib.js";
 export * from "./urbalurba/lib/insightlylib.js";
