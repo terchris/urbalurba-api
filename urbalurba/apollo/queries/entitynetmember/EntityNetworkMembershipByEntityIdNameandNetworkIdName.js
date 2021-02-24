@@ -16,8 +16,6 @@ query EntityNetworkMembershipByEntityIdNameandNetworkIdName(
   ) {
     id
     text
-    displayName
-    summary
   }
 }
 
