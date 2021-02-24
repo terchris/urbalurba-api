@@ -1806,6 +1806,15 @@ export async function updateInsightlyOrganization(insightlyRecord) {
     let data = "none";
     let result;
 
+    // There is a bug in insightly - sometimes the field "IMAGE_URL" is long and contains an invalid url
+    // if we try to write it back to insightly - then we get an error. So we test for the lenght - it it is long we set it to empy
+    if (insightlyRecord.IMAGE_URL) {
+        if (insightlyRecord.IMAGE_URL.length > 100) {
+            insightlyRecord.IMAGE_URL = null;
+        }
+    }
+
+
     try {
 
         result = await axios(
@@ -2079,7 +2088,7 @@ function deleteInsightlyTag(tagName, tagArray) {
     let foundIndex;
 
     foundIndex = tagArray.findIndex(tag => tag.TAG_NAME == tagName);
-    if (foundIndex > 0) {
+    if (foundIndex >= 0) {
         tagArray.splice(foundIndex, 1);
     }
     return tagArray
