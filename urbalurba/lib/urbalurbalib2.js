@@ -18,6 +18,7 @@ export const DEFAULT_PARENT_IDNAME="urbalurba.no"; //if an entity has no parent 
  * used to get values in deep nested objects 
  * returns the value if there is one otherwise "undefined"
  * see example here
+ * or here: tmpResult = getNested(algoliaRecord, "location", "gps");
  * https://www.w3docs.com/snippets/javascript/how-to-check-for-the-existence-of-nested-javascript-object-key.html
  */
 export function getNested(obj, ...args) {
