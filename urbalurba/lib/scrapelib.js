@@ -961,7 +961,9 @@ async function getJobFacebookArray(job) {
 
 
 /** maestro
- maestro is the one that start jobs 
+ 
+TODO: doc is wrong - udate it!
+maestro is the one that start jobs 
 all other jobs must give control back to maestro when they finish
 
 The jobs have these statuses
@@ -1095,49 +1097,6 @@ for (let i=0; i < jobList.length; i++) { // loop the list of job types
 
 
 
-/*
-async function maestroPrepareWebpageInfo(jobArray) {
-
-
-    const STARTJOB = "webpage-info";
-    const JOBSTATUS = "Ready";
-
-    let added2Queue = 0;
-
-    if (jobArray.length > 0) { // we got some jobs
-
-        for (let i = 0; i < jobArray.length; i++) {
-            let scrapeRecord = jobArray[i];
-
-
-            // we must look at all the memberships for one entry and see if here is a web property. If there is more than one -- what then ?
-            let membershipArray = Object.getOwnPropertyNames(scrapeRecord.jsonScrapeData.memberships); //get list of all memberships
-
-            for (let prop = 0; prop < membershipArray.length; prop++) { // loop all memberships 
-                let name = membershipArray[prop];
-                let currentMembership = scrapeRecord.jsonScrapeData.memberships[name];
-                let web = getNested(currentMembership, "web"); // get value of property web - if there is one
-                if (web) { // web has a value
-
-                    let didStart = await setJobStatus(config,scrapeRecord.id, STARTJOB, JOBSTATUS, scrapeRecord.jobs);
-                    added2Queue++;
-                    console.log("maestroPrepareWebpageInfo: (" + added2Queue + ") Added :" + scrapeRecord.idName);
-                    break; // stop looping/looking for other web properties for this 
-
-                }
-
-            }
-
-
-        }
-
-    }
-    console.log("maestroPrepareWebpageInfo: Jobs added to queue:" + added2Queue);
-
-    return added2Queue;
-}
-
-*/
 
 
 //delete exports.useEmailAsDomain = useEmailAsDomain;
