@@ -382,7 +382,13 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
         existingData[config.DATA_SECTION_OUTPUT][jobName] = data; //update info from the source    
 
         // get all the top level ID's
-        urbalurbaIdName = mergeArray[0].urbalurbaIdName; // just copy the old one   
+                
+        if (mergeArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
+            urbalurbaIdName = mergeArray[0].urbalurbaIdName; //keep the initial 
+        } else {
+            urbalurbaIdName = data.urbalurbaIdName; //if not take the one from the new data
+        }
+
 
 
         if (mergeArray[0].organizationNumber) { // we have a organizationNumber
@@ -498,7 +504,12 @@ export async function createEntities(config) {
                         updatedData[config.DATA_SECTION_OUTPUT][jobName] = members[member]
 
                         // get all the top level ID's
-                        let urbalurbaIdName = existingMergeRecordArray[0].urbalurbaIdName; //keep the initial 
+                        let urbalurbaIdName = "";
+                        if (existingMergeRecordArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
+                            urbalurbaIdName = existingMergeRecordArray[0].urbalurbaIdName; //keep the initial 
+                        } else {
+                            urbalurbaIdName = members[member].urbalurbaIdName; //if not take the one from the new data
+                        }
 
                         let organizationNumber = "";
                         if (existingMergeRecordArray[0].organizationNumber) { // we have a organizationNumber
