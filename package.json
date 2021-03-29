@@ -1,6 +1,6 @@
 {
   "name": "urbalurba-api",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "functions for accessing the urbalura backend",
   "main": "index.js",
   "type": "module",
@@ -20,7 +20,6 @@
   "homepage": "https://github.com/terchris/urbalurba-api#readme",
   "dependencies": {
     "@apollo/client": "^3.3.7",
-    "@terchris/tiny": "^1.0.1",
     "axios": "^0.21.1",
     "cross-fetch": "^3.0.6",
     "dotenv": "^8.2.0",

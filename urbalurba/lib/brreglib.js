@@ -93,7 +93,7 @@ export async function getOrganizationsByName(orgName) {
         orgNameSearchTxt = orgNameSearchTxt.toUpperCase();
         orgNameSearchTxt = orgNameSearchTxt.trim();
 
-        
+
         orgNameSearchTxt = encodeURIComponent(orgNameSearchTxt); // encode it correctly
 
         brregRequestURL = BRREG_ENHETER_URL + "?navn=" + orgNameSearchTxt;
@@ -199,3 +199,52 @@ export async function getOneOrganizationByName(orgName) {
 
     return returnOrganization;
 }
+
+
+
+
+
+/** getOrgByWeb
+ * Takes a domain name like www.somedoman.com or somedomain.com - if found a organization is returned
+ * Returns "none" is there are no org by that domain
+ The data returned is described here https://data.brreg.no/enhetsregisteret/api/docs/index.html#enheter-oppslag
+ */
+export async function getOrgByWeb(domainName) {
+
+
+    const BRREG_ENHETER_URL = "https://data.brreg.no/enhetsregisteret/api/enheter/";
+    let brregRequestURL;
+
+    let data = "none";
+    let response;
+
+
+    if (domainName) { // has value and is not null 
+
+        brregRequestURL = BRREG_ENHETER_URL + "?hjemmeside=" + domainName;
+
+        try {
+            response = await axios.get(brregRequestURL);
+
+            if (null != response.data.page.totalElements > 0) { // there is a result set            
+                data = response.data; // return the one that is there
+            } else {
+                console.error("err getOrgByWeb noone registered with web:", JSON.stringify(response));
+            }
+
+        }
+        catch (e) {
+            console.error("1.9 getOrgByWeb catch error:", JSON.stringify(e, null, 2));
+            debugger
+        }
+
+
+    } else { //no domainName parameter
+        data = "none";
+    }
+
+
+    return data;
+
+}
+

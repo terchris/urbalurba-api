@@ -1503,7 +1503,7 @@ A strapi record looks like this
 }    
  
  */
-function insightly2strapiEntityRecord(insightlyRecord, entitytypeID) {
+export function insightly2strapiEntityRecord(insightlyRecord, entitytypeID) {
     let strapiRecord = {};
 
     let socialLinks = {};
@@ -1767,7 +1767,7 @@ function insightly2strapiEntityRecord(insightlyRecord, entitytypeID) {
  * Get the organisations that are tagged with tagName
  *
  */
-async function getAllInsightlyOrganizationsByTag(tagName) {
+export async function getAllInsightlyOrganizationsByTag(tagName) {
 
 
     let insightlyRequestURL = INSIGHTLY_ORGANIZATIONSBYTAGURI + tagName;

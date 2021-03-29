@@ -48,7 +48,7 @@ async function getAllMerges(config) {
 /** getMergesByIdNameANDentitytype
  get (should be just one) Merge by idName and entitytype
  */
-async function getMergesByIdNameANDentitytype(config,idName, entitytype) {
+async function getMergesByIdNameANDentitytype(config, idName, entitytype) {
 
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "?entitytype=" + entitytype + "&idName=" + idName;
@@ -116,7 +116,7 @@ async function getMergesByEntitytypeANDstatus(config, entitytype, jobStatus) {
 /** updateMerge
  updates a record in the merge dataset
  */
-async function updateMerge(config,newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, jobLog) {
+async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
@@ -144,6 +144,16 @@ async function updateMerge(config,newData, idName, jobStatus, mergeID, urbalurba
     if (sbn_insightly) {
         mergeRecord.sbn_insightly = sbn_insightly;
     }
+
+    if (domain) {
+        mergeRecord.domain = domain;
+    }
+
+    if (web) {
+        mergeRecord.web = web;
+    }
+
+
 
 
     let data = "none";
@@ -179,7 +189,7 @@ async function updateMerge(config,newData, idName, jobStatus, mergeID, urbalurba
 /** createMerge
  creates a new record in the merge dataset
  */
-async function createMerge(config,newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly) {
+async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET;
 
@@ -208,6 +218,15 @@ async function createMerge(config,newData, idName, jobStatus, urbalurbaIdName, o
     if (sbn_insightly) {
         mergeRecord.sbn_insightly = sbn_insightly;
     }
+
+    if (domain) {
+        mergeRecord.domain = domain;
+    }
+
+    if (web) {
+        mergeRecord.web = web;
+    }
+
 
     let data = "none";
     let result;
@@ -273,7 +292,7 @@ function addJobLog(jobName, jobStatus, jobLogField) {
 /** setJobStatus
  set the jobStatus for a jobName
  */
-export async function setJobStatus(config,mergeID, jobName, jobStatus, jobLog) {
+export async function setJobStatus(config, mergeID, jobName, jobStatus, jobLog) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
@@ -329,7 +348,7 @@ export async function setJobStatus(config,mergeID, jobName, jobStatus, jobLog) {
 * if there is - then the record is updated with the latest jsonScrapeData
 * if not- then the recod is created.
 */
-export async function pushData(config,data, idName, entitytype, jobStatus) {
+export async function pushData(config, data, idName, entitytype, jobStatus) {
 
     let returnResult = "none";
 
@@ -346,8 +365,10 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
     let organizationNumber = null;
     let urbalurbaIdName = null;
     let sbn_insightly = null;
+    let domain = null;
+    let web = null;
 
-    let mergeArray = await getMergesByIdNameANDentitytype(config,idName, entitytype);
+    let mergeArray = await getMergesByIdNameANDentitytype(config, idName, entitytype);
 
     if (mergeArray.length == 0) { // there is no previous record
 
@@ -356,10 +377,12 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
         newData[config.DATA_SECTION_OUTPUT] = {};
         newData[config.DATA_SECTION_OUTPUT][jobName] = data;
         urbalurbaIdName = data.urbalurbaIdName; //assume there is
-        organizationNumber = data.organizationNumber; //assume there is
-        //TODO: get the insightly id
+        organizationNumber = data.organizationNumber; //assume there is        
+        sbn_insightly = data.sbn_insightly; //assume there is
+        domain = data.domain; //assume there is
+        web = data.web; //assume there is
 
-        let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly);
+        let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
 
 
         if (mergeRecord == "none") { // there is was an error
@@ -382,7 +405,7 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
         existingData[config.DATA_SECTION_OUTPUT][jobName] = data; //update info from the source    
 
         // get all the top level ID's
-                
+
         if (mergeArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
             urbalurbaIdName = mergeArray[0].urbalurbaIdName; //keep the initial 
         } else {
@@ -398,11 +421,23 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
         }
 
 
-        
+
         if (mergeArray[0].sbn_insightly) { // we have a insightly ID
             sbn_insightly = mergeArray[0].sbn_insightly; // keep the initial
         } else { // we take whatever is here
             sbn_insightly = data.sbn_insightly;
+        }
+
+        if (mergeArray[0].domain) { // we have a domain
+            domain = mergeArray[0].domain; // keep the initial
+        } else { // we take whatever is here
+            domain = data.domain;
+        }
+
+        if (mergeArray[0].web) { // we have a web
+            web = mergeArray[0].web; // keep the initial
+        } else { // we take whatever is here
+            web = data.web;
         }
 
 
@@ -410,7 +445,7 @@ export async function pushData(config,data, idName, entitytype, jobStatus) {
 
 
 
-        let updateMergeRecordResult = await updateMerge(config,existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, mergeArray[0].jobLog);
+        let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, mergeArray[0].jobLog);
 
         if (updateMergeRecordResult == "none") { // there is was an error
             console.error("pushData: Error updating scraping for:" + idName);
@@ -437,7 +472,7 @@ async function getFirstReadyNetwork(config) {
     let jobStatusInput = config.JOBSTATUS_INPUT;
     let entitytypeInput = config.ENTITYTYPE_INPUT;
 
-    mergedRecordArray = await getMergesByEntitytypeANDstatus(config,entitytypeInput, jobStatusInput);
+    mergedRecordArray = await getMergesByEntitytypeANDstatus(config, entitytypeInput, jobStatusInput);
 
     if (mergedRecordArray.length > 0) { // there are ready 
         firstMergeRecord = mergedRecordArray[0]; // we pick the first one
@@ -465,7 +500,7 @@ export async function createEntities(config) {
 
         let statusResult;
 
-        statusResult = await setJobStatus(config,firstNetwork.id, config.JOBNAME, "Running", firstNetwork.jobLog); // mark the network so that we know it is running
+        statusResult = await setJobStatus(config, firstNetwork.id, config.JOBNAME, "Running", firstNetwork.jobLog); // mark the network so that we know it is running
 
         //inside the data property there should be just one property.And that property should have the jobName of the job that created it
         // since that can be lots of jobName's we must list them to find its name. Then pick that name
@@ -479,7 +514,7 @@ export async function createEntities(config) {
             for (let member = 0; member < members.length; member++) {
                 let idName = members[member].domain;
                 if (idName) {
-                    let existingMergeRecordArray = await getMergesByIdNameANDentitytype(config,idName, config.ENTITYTYPE_OUTPUT);
+                    let existingMergeRecordArray = await getMergesByIdNameANDentitytype(config, idName, config.ENTITYTYPE_OUTPUT);
                     if (existingMergeRecordArray.length == 0) { // there is no previous record      
 
                         let newData = {};
@@ -491,7 +526,7 @@ export async function createEntities(config) {
                         let organizationNumber = members[member].organizationNumber;
                         let sbn_insightly = members[member].sbn_insightly;
 
-                        let createResult = await createMerge(config,newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly);
+                        let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly);
                         if (createResult == "none") { // there is was an error
                             console.error("createEntities: (" + member + ") idName:" + idName + " Error creating");
                         } else {
@@ -525,8 +560,8 @@ export async function createEntities(config) {
                             sbn_insightly = members[member].sbn_insightly;
                         }
 
-                                                   
-                        let updateResult = await updateMerge(config,updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, existingMergeRecordArray[0].jobLog);
+
+                        let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, existingMergeRecordArray[0].jobLog);
                         if (updateResult == "none") { // there is was an error
                             console.error("createEntities: Error cannot update idName=" + idName);
                         } else {
@@ -543,7 +578,7 @@ export async function createEntities(config) {
 
 
             // Finished updating - now we mark it finished
-            statusResult = await setJobStatus(config,firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
+            statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
 
 
         } else {
@@ -626,6 +661,7 @@ export function useEmailAsDomain(email) {
 
 /** domainFromWeb
  * takes a web address. If the domain name can be extracted from it 
+ * if there is a www.domainname.no then www. is removed
  * then the domain name is returned - if not then "" is returned
  */
 export function domainFromWeb(web) {
@@ -634,10 +670,7 @@ export function domainFromWeb(web) {
 
     if ((web != "") && (web != null) && (web != undefined)) { // there is a web address
 
-        // there is a posibility that the web address does not contain http:// or https://        
-        if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
-            web = "http://" + web; //just add http
-        }
+        web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
 
         try {
             let tmpUrl = new URL(web); // can cause error if it is not a valid web address
@@ -805,8 +838,8 @@ export function name2UrbalurbaIdName(displayName) {
 
 /** getMergesByJobANDjobStatus
 Gets all merge records with jobName= and jobStatus=
-*/ 
-async function getMergesByJobANDjobStatus(config,jobName, jobStatus) {
+*/
+export async function getMergesByJobANDjobStatus(config, jobName, jobStatus) {
 
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "?jobName=" + jobName + "&jobStatus=" + jobStatus + "&entitytype=" + config.ENTITYTYPE_INPUT;
@@ -839,11 +872,11 @@ async function getMergesByJobANDjobStatus(config,jobName, jobStatus) {
 /** getJobArray_web
   Gets the web links to for the merge record that has jobName
  */
-export async function getJobArray_web(config,jobName) {
+export async function getJobArray_web(config, jobName) {
 
     let returnJobArray = [];
 
-    let jobArray = await getMergesByJobANDjobStatus(config,jobName, config.JOBSTATUS_INPUT);
+    let jobArray = await getMergesByJobANDjobStatus(config, jobName, config.JOBSTATUS_INPUT);
 
     if (jobArray.length > 0) { // we got some jobs
 
@@ -859,18 +892,18 @@ export async function getJobArray_web(config,jobName) {
                 let currentMembership = mergeRecord.data[config.DATA_SECTION_INPUT][name];
                 let web = getNested(currentMembership, "web"); // get value of property web - if there is one
                 if (web) { // web has a value
-                    console.log("getJobArray_web: (" + i +") idName:" + mergeRecord.idName + " web:" + web + " found");                    
+                    console.log("getJobArray_web: (" + i + ") idName:" + mergeRecord.idName + " web:" + web + " found");
                     // there is a posibility that the web address does not contain http:// or https://        
                     if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
                         web = "http://" + web; //just add http
                     }
-                    
+
                     let webObject = {
                         url: web,
                         userData: {
                             domain: mergeRecord.idName,
                             id: mergeRecord.id,
-                            jobLog: mergeRecord.jobLog 
+                            jobLog: mergeRecord.jobLog
                         }
                     }
 
@@ -901,7 +934,7 @@ async function getJobFacebookArray(job) {
 
     let jobFacebookArray = [];
 
-    let jobArray = await getMergesByJobANDjobStatus(config,job, "Ready");
+    let jobArray = await getMergesByJobANDjobStatus(config, job, "Ready");
 
     if (jobArray.length > 0) { // we got some jobs
 
@@ -1059,72 +1092,398 @@ Stop: Job=maestro JobStatus=Ready
 export async function maestro(config) {
 
 
-const jobList = [
-{
-    number: 1,
-    previousJobName: "members2organization",
-    getJobStatus: "Finished",
-    nextJobName: "webpage-info",
-    setJobStatus: "Ready",
-    nextJobStartUrl: "https://jalla.com"
-    
-},
-{
-    number: 2,
-    previousJobName: "webpage-info",
-    getJobStatus: "Finished",
-    nextJobName: "facebook-info",
-    setJobStatus: "Ready",
-    nextJobStartUrl: "https://jalla.com",
-    
-}
-];
+    const jobList = [
+        {
+            number: 1,
+            previousJobName: "members2organization",
+            getJobStatus: "Finished",
+            nextJobName: "webpage-info",
+            setJobStatus: "Ready",
+            nextJobStartUrl: "https://jalla.com"
+
+        },
+        {
+            number: 2,
+            previousJobName: "webpage-info",
+            getJobStatus: "Finished",
+            nextJobName: "facebook-info",
+            setJobStatus: "Ready",
+            nextJobStartUrl: "https://jalla.com",
+
+        },
+        {
+            number: 3,
+            previousJobName: "facebook-info",
+            getJobStatus: "Finished",
+            nextJobName: "brreg-info",
+            setJobStatus: "Ready",
+            nextJobStartUrl: "https://jalla.com",
+
+        }
+    ];
 
 
-let finishedJobArray = [];
-    
-for (let i=0; i < jobList.length; i++) { // loop the list of job types
+    let finishedJobArray = [];
 
-    finishedJobArray = await getMergesByJobANDjobStatus(config,jobList[i].previousJobName, jobList[i].getJobStatus);
+    for (let i = 0; i < jobList.length; i++) { // loop the list of job types
 
-    for(let readyJob =0; readyJob < finishedJobArray.length; readyJob++) { //loop the ready jobs
-        let setJobResult = await setJobStatus(config,finishedJobArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog );
-        console.log("maestro: ("+ readyJob +") idName:" + finishedJobArray[readyJob].idName +" previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
+        finishedJobArray = await getMergesByJobANDjobStatus(config, jobList[i].previousJobName, jobList[i].getJobStatus);
+
+        for (let readyJob = 0; readyJob < finishedJobArray.length; readyJob++) { //loop the ready jobs
+            let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
+            console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
+        }
+        if (finishedJobArray.length > 0) { // if there was stuff to be processed - then
+            console.log("maestro: starting  nextJobName:" + jobList[i].nextJobName); //send signal to start the nextJob
+        }
+
+
+
     }
-    if (finishedJobArray.length > 0 ) { // if there was stuff to be processed - then
-        console.log("maestro: starting  nextJobName:" + jobList[i].nextJobName); //send signal to start the nextJob
+
+}
+
+
+/** findFirstAttribute
+takes a full mergeRecord and searches for attribute in a property named dataSection
+Returns the value if found or "none" if not found
+
+example 
+    mergeRecord = {
+        "data": {
+            "memberships": {
+                "avfallnorge-no-members": {
+                    "scrapeDate": "2021-03-23T13:30:40.054Z",
+                    "domain": "terrateam.no",
+                    "displayName": "Miljøteknikk Terrateam AS",
+                    "phone": "75144950",
+                    "urbalurbaIdName": "miljoteknikk-terrateam",
+                    "networkIdName": "avfallnorge.no",
+                    "web": "http://www.terrateam.no/",
+                    "location": "Mo i Rana",
+                    "email": "miljoteknikk@­terrateam.no"
+                }
+            }
+        }
     }
+
+findFirstAttribute(mergeRecord, "memberships", "web") returns "http://www.terrateam.no/"
     
+ */
+
+export function findFirstAttribute(mergeRecord, dataSection, attribute) {
+
+
+    let attributeValue = "none";
+
+    let dataSectionNames = Object.getOwnPropertyNames(mergeRecord.data[dataSection]); //get list of all properties i the dataSection
+
+    for (let prop = 0; prop < dataSectionNames.length; prop++) { // loop all properties 
+        let name = dataSectionNames[prop];
+        let currentDataSection = mergeRecord.data[dataSection][name];
+        attributeValue = getNested(currentDataSection, attribute); // get value of the property - if there is one
+
+        if (attributeValue) {
+            break; // stop looping - we have found the value
+        }
+
+    }
+
+    return attributeValue;
 
 
 }
 
+/** addWebProtocol
+ adds http:// to a web address if it does not have http or https
+ */
+export function addWebProtocol(web) {
 
+    // there is a posibility that the web address does not contain http:// or https://        
+    if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
+        web = "http://" + web; //just add http
+    }
+    return web;
+}
 
+/** stripWebUrl
+ * takes a web address. verifies that it is a legal address and removes the path and the protocoll
+ * valid hostname is returned - if not then "" is returned
+ */
+export function stripWebUrl(web) {
 
+    let returnHostname = "";
 
+    if ((web != "") && (web != null) && (web != undefined)) { // there is a web address
+
+        web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
+
+        try {
+            let tmpUrl = new URL(web); // can cause error if it is not a valid web address
+            let hostname = tmpUrl.hostname;
+
+            if (hostname) {
+                returnHostname = hostname;
+            }
+        }
+        catch (e) { // the web address is not valid
+            console.log("Invalid web:" + web);
+        }
+
+    }
+
+    return returnHostname;
 
 }
 
+/** brreg2MergeRecord
+convers a brreg record to a merge record. 
+ This is done so that all programs that put data into the merge record uses the same attributes
+
+
+ the brregRecord is the data comming from brreg. The data format  may vary depending on what type of lookup we are doing.
+
+The following data formats exists:
+- direct lookup using organizationNumber --> just one element is returned
+- search using web -> one or more elements is returned
+
+If there are just one org returned we set the field urbalurbaVerified = "yes"
+If more than one org is returned - thn we must do :
+* urbalurbaVerified = "no"
+* get all org numbers - what do we do with them
+
+ 
+ The following field must be changed:
+ 
+copy field: "hjemmeside" --> "domain" and remove the www is any
+copy field: "navn" --> "displayName"
+create field: urbalurbaIdName: name2UrbalurbaIdName(displayName)
+copy field: "hjemmeside" --> "url" and add http://
+copy field: "organisasjonsnummer" --> "organizationNumber"
+create field: urbalurbaScrapeDate 
+create field: urbalurbaVerified
+
+copy field:
+"forretningsadresse": {
+                    "land": "Norge",
+                    "landkode": "NO",
+                    "postnummer": "8626",
+                    "poststed": "MO I RANA",
+                    "adresse": [
+                        "Tungtransportveien 19"
+                    ],
+                    "kommune": "RANA",
+                    "kommunenummer": "1833"
+                },
+to                 
+    "location": {
+        "visitingAddress": {
+            "street": "Tungtransportveien 19",
+            "city": "MO I RANA",
+            "postcode": "8626",
+            "country": "Norway"
+        },
+
+
+
+In the brregRecord there are some categories: 
+    "naeringskode1": {
+        "beskrivelse": "Sortering og bearbeiding av avfall for materialgjenvinning",
+        "kode": "38.320"
+    },
+    "naeringskode2": {
+    "beskrivelse" : "Skipsmegling",
+    "kode" : "52.292"
+    },   
+
+They will be converted to:    
+"categories": {
+        "naeringskode": [
+            "38.320",
+            "52.292"
+        ],
+        "organisasjonsform": [
+            "AS"
+        ],
+        "institusjonellSektorkode": [
+            "2100"
+        ]
+    }
+
+ */
+export function brreg2mergeRecord(brregRecord, hjemmeside) {
+
+    let tmpResult = "";
+    let mergeRecord = {};
+
+    let oneBrregOrg; // this is the one we are going to select
+
+    const BRREG_VERIFIED = "yes"; // a direct web lookup is verified
+    const BRREG_MANY = "many"; // a direct web lookup is NOT verified
+
+    let urbalurbaScrapeDate = new Date().toISOString();
+    // add fields 
+    mergeRecord.urbalurbaScrapeDate = urbalurbaScrapeDate;
+
+
+    // first figure out if we have more than one response
+    tmpResult = getNested(brregRecord, "page", "totalElements");
+    if (tmpResult) { // The brregRecord is from a  web search 
+        if (tmpResult > 1) { // yes we have more than one result 
+
+            let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
+            let brregWebEnheter = []; // for storing the result enheter that actually has the hjemmeside 
+            for (let j = 0; j < brregEnheter.length; j++) { //loop the org's returned
+
+                if (brregEnheter[j].hjemmeside.toLowerCase() == hjemmeside.toLowerCase()) {
+                    brregWebEnheter.push(brregEnheter[j]); // if it is the same - then we keep it
+                }
+            }
+            if (brregWebEnheter.length == 1) { // there is just one - we select it 
+                oneBrregOrg = brregWebEnheter[0]; //slect the first and only one
+                mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+                mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+            } else {
+
+                if (brregWebEnheter.length > 1) { // there are several                        
+                    mergeRecord.urbalurbaImport = brregWebEnheter; //store them all
+                    mergeRecord.urbalurbaVerified = BRREG_MANY;
+                } else {// there are none
+                    // the search is sending bullshit back to us
+                    // not sure what to do 
+                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning where NONE has correct hjemmeside !!")
+                    debugger;
+                }
+
+            }
+
+
+        } else { //there is just one result
+            oneBrregOrg = brregRecord._embedded.enheter[0]; //slect the first and only one
+            mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+            mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+        }
+
+    } else { // The brregRecord is from org number lookup
+        oneBrregOrg = brregRecord; // the record contains just one
+        mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"
+        mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+    }
 
 
 
 
-//delete exports.useEmailAsDomain = useEmailAsDomain;
-// elete exports.domainFromWeb = domainFromWeb;
-// delete exports.name2UrbalurbaIdName = name2UrbalurbaIdName;
-
-//for webpage-info
-//exports.findLinkText = findLinkText;
-//exports.pageImages2Array = pageImages2Array;
-
-//exports.companyName2displayName = companyName2displayName;
-//exports.getJobArray_web = getJobArray_web;
-//exports.getJobFacebookArray = getJobFacebookArray;
-//exports.maestro = maestro;
-
-//exports.pushData = pushData;
-//exports.setJobStatus= setJobStatus; // used by: webpage-info
+    // if we dont have a oneBrregOrg then we can skip the rest.
+    if (oneBrregOrg) {
 
 
-//exports.createEntities = createEntities;
+        //copy field: "hjemmeside" --> "domain" and remove the www is any
+        tmpResult = getNested(oneBrregOrg, "hjemmeside");
+        if (tmpResult) { // its there        
+            mergeRecord.domain = domainFromWeb(tmpResult);
+        }
+
+        //copy field: "navn" --> "displayName"
+        tmpResult = getNested(oneBrregOrg, "navn");
+        if (tmpResult) { // its there
+            mergeRecord.displayName = tmpResult;
+        }
+
+        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
+
+
+        //copy field: "hjemmeside" --> "url" and add http://
+        tmpResult = getNested(oneBrregOrg, "hjemmeside");
+        if (tmpResult) { // its there
+            mergeRecord.url = addWebProtocol(tmpResult);
+        }
+
+
+        //copy field: "organisasjonsnummer" --> "organizationNumber"
+        tmpResult = getNested(oneBrregOrg, "organisasjonsnummer");
+        if (tmpResult) { // its there
+            mergeRecord.organizationNumber = tmpResult;
+        }
+
+
+        //copy and reformat field: "forretningsadresse" --> "location"
+
+        tmpResult = getNested(oneBrregOrg, "forretningsadresse");
+        if (tmpResult) { // its there
+            mergeRecord.location = {
+                visitingAddress: {}
+            };
+            tmpResult = getNested(oneBrregOrg, "forretningsadresse", "adresse");
+            if (tmpResult) { // its there
+                mergeRecord.location.visitingAddress.street = tmpResult[0];
+            }
+            tmpResult = getNested(oneBrregOrg, "forretningsadresse", "poststed");
+            if (tmpResult) { // its there
+                mergeRecord.location.visitingAddress.city = tmpResult;
+            }
+            tmpResult = getNested(oneBrregOrg, "forretningsadresse", "postnummer");
+            if (tmpResult) { // its there
+                mergeRecord.location.visitingAddress.postcode = tmpResult;
+            }
+            tmpResult = getNested(oneBrregOrg, "forretningsadresse", "land");
+            if (tmpResult) { // its there
+                if (tmpResult.toUpperCase() == "NORGE") tmpResult = "Norway"; // translate Norge to Norway
+                mergeRecord.location.visitingAddress.country = tmpResult;
+            }
+
+        } // end if forretningsadresse
+
+
+        // now the categories
+        mergeRecord.categories = {};
+
+        // first naeringskode    
+        mergeRecord.categories.naeringskode = [];
+
+        // there can be 3 of them
+        tmpResult = getNested(oneBrregOrg, "naeringskode1", "kode");
+        if (tmpResult) { // its there        
+            mergeRecord.categories.naeringskode.push(tmpResult);
+        }
+
+        // there can be 3 of them
+        tmpResult = getNested(oneBrregOrg, "naeringskode2", "kode");
+        if (tmpResult) { // its there        
+            mergeRecord.categories.naeringskode.push(tmpResult);
+        }
+
+        // there can be 3 of them
+        tmpResult = getNested(oneBrregOrg, "naeringskode3", "kode");
+        if (tmpResult) { // its there        
+            mergeRecord.categories.naeringskode.push(tmpResult);
+        }
+
+
+        // then organisasjonsform
+        mergeRecord.categories.organisasjonsform = [];
+        // there is just one
+        tmpResult = getNested(oneBrregOrg, "organisasjonsform", "kode");
+        if (tmpResult) { // its there        
+            mergeRecord.categories.organisasjonsform.push(tmpResult);
+        }
+
+
+        // then institusjonellSektorkode
+        mergeRecord.categories.institusjonellSektorkode = [];
+        // there is just one
+        tmpResult = getNested(oneBrregOrg, "institusjonellSektorkode", "kode");
+        if (tmpResult) { // its there        
+            mergeRecord.categories.institusjonellSektorkode.push(tmpResult);
+        }
+
+    } else { // we dont have a oneBrregOrg
+        let totalElements = getNested(brregRecord, "page", "totalElements");
+        mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " resulted in:" + totalElements + " organizations";
+
+    }
+
+
+    return mergeRecord;
+
+}
+
