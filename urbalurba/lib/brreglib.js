@@ -226,10 +226,10 @@ export async function getOrgByWeb(domainName) {
         try {
             response = await axios.get(brregRequestURL);
 
-            if (null != response.data.page.totalElements > 0) { // there is a result set            
+            if (response.data.page.totalElements > 0) { // there is a result set            
                 data = response.data; // return the one that is there
             } else {
-                console.error("err getOrgByWeb noone registered with web:", JSON.stringify(response));
+                console.log("err getOrgByWeb noone registered with web:", domainName);
             }
 
         }

@@ -445,7 +445,7 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
 
 
-        let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, mergeArray[0].jobLog);
+        let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog);
 
         if (updateMergeRecordResult == "none") { // there is was an error
             console.error("pushData: Error updating scraping for:" + idName);
@@ -525,8 +525,11 @@ export async function createEntities(config) {
                         let urbalurbaIdName = members[member].urbalurbaIdName;
                         let organizationNumber = members[member].organizationNumber;
                         let sbn_insightly = members[member].sbn_insightly;
+                        let domain = members[member].domain;
+                        let web = members[member].web;
+                        web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
 
-                        let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly);
+                        let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
                         if (createResult == "none") { // there is was an error
                             console.error("createEntities: (" + member + ") idName:" + idName + " Error creating");
                         } else {
@@ -560,8 +563,22 @@ export async function createEntities(config) {
                             sbn_insightly = members[member].sbn_insightly;
                         }
 
+                        let domain = "";
+                        if (existingMergeRecordArray[0].domain) { // we have a domain
+                            domain = existingMergeRecordArray[0].domain; // keep the initial
+                        } else { // we take whatever is here
+                            domain = members[member].domain;
+                        }
 
-                        let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, existingMergeRecordArray[0].jobLog);
+                        let web = "";
+                        if (existingMergeRecordArray[0].web) { // we have a domain
+                            web = existingMergeRecordArray[0].web; // keep the initial
+                        } else { // we take whatever is here
+                            web = members[member].web;
+                        }
+                        web = addWebProtocol(web);
+
+                        let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog);
                         if (updateResult == "none") { // there is was an error
                             console.error("createEntities: Error cannot update idName=" + idName);
                         } else {
@@ -1106,32 +1123,40 @@ export async function maestro(config) {
             number: 2,
             previousJobName: "webpage-info",
             getJobStatus: "Finished",
-            nextJobName: "facebook-info",
+            nextJobName: "brreg-orgnum,brreg-web",
             setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com",
-
-        },
-        {
-            number: 3,
-            previousJobName: "facebook-info",
-            getJobStatus: "Finished",
-            nextJobName: "brreg-info",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com",
-
+            nextJobStartUrl: "https://jalla.com"
         }
     ];
 
 
     let finishedJobArray = [];
+    let totQued =0;
 
     for (let i = 0; i < jobList.length; i++) { // loop the list of job types
 
         finishedJobArray = await getMergesByJobANDjobStatus(config, jobList[i].previousJobName, jobList[i].getJobStatus);
 
         for (let readyJob = 0; readyJob < finishedJobArray.length; readyJob++) { //loop the ready jobs
-            let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
-            console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
+
+
+            if (jobList[i].number == 2) { // after web-info we must do one of two lookups depending on if we have a org number or not
+                if (finishedJobArray[readyJob].organizationNumber ) { // if we have a org num
+                    let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, "brreg-orgnum", jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
+                    console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-orgnum");
+                    totQued++;
+                } else { //there is no orgnum - we will try using web 
+                    let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, "brreg-web", jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
+                    console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-web");
+                    totQued++;
+                }
+            } else { // it is not job number 2
+                let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
+                console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
+                totQued++;
+            }
+
+
         }
         if (finishedJobArray.length > 0) { // if there was stuff to be processed - then
             console.log("maestro: starting  nextJobName:" + jobList[i].nextJobName); //send signal to start the nextJob
@@ -1140,6 +1165,15 @@ export async function maestro(config) {
 
 
     }
+
+
+
+
+return "Total queued is: " + totQued;
+
+
+
+
 
 }
 
@@ -1199,9 +1233,11 @@ export function findFirstAttribute(mergeRecord, dataSection, attribute) {
  */
 export function addWebProtocol(web) {
 
-    // there is a posibility that the web address does not contain http:// or https://        
-    if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
-        web = "http://" + web; //just add http
+    if ((web != "") && (web != null) && (web != undefined)) { // there is a web address
+        // there is a posibility that the web address does not contain http:// or https://        
+        if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
+            web = "http://" + web; //just add http
+        }
     }
     return web;
 }
@@ -1258,7 +1294,7 @@ If more than one org is returned - thn we must do :
 copy field: "hjemmeside" --> "domain" and remove the www is any
 copy field: "navn" --> "displayName"
 create field: urbalurbaIdName: name2UrbalurbaIdName(displayName)
-copy field: "hjemmeside" --> "url" and add http://
+copy field: "hjemmeside" --> "web" and add http://
 copy field: "organisasjonsnummer" --> "organizationNumber"
 create field: urbalurbaScrapeDate 
 create field: urbalurbaVerified
@@ -1317,6 +1353,7 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
     let mergeRecord = {};
 
     let oneBrregOrg; // this is the one we are going to select
+    let totalElements = 0; // number of orgs returned by search
 
     const BRREG_VERIFIED = "yes"; // a direct web lookup is verified
     const BRREG_MANY = "many"; // a direct web lookup is NOT verified
@@ -1327,15 +1364,17 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
 
 
     // first figure out if we have more than one response
-    tmpResult = getNested(brregRecord, "page", "totalElements");
-    if (tmpResult) { // The brregRecord is from a  web search 
-        if (tmpResult > 1) { // yes we have more than one result 
+    totalElements = getNested(brregRecord, "page", "totalElements");
+    if (totalElements) { // The brregRecord is from a  web search 
+        if (totalElements > 1) { // yes we have more than one result 
 
             let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
             let brregWebEnheter = []; // for storing the result enheter that actually has the hjemmeside 
             for (let j = 0; j < brregEnheter.length; j++) { //loop the org's returned
 
-                if (brregEnheter[j].hjemmeside.toLowerCase() == hjemmeside.toLowerCase()) {
+                let fixHjemmeside = brregEnheter[j].hjemmeside.toLowerCase();
+                fixHjemmeside = stripWebUrl(fixHjemmeside); //we need to do this because the hjemmeside sometimes has a ending "/"
+                if (fixHjemmeside == hjemmeside.toLowerCase()) {
                     brregWebEnheter.push(brregEnheter[j]); // if it is the same - then we keep it
                 }
             }
@@ -1348,10 +1387,12 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
                 if (brregWebEnheter.length > 1) { // there are several                        
                     mergeRecord.urbalurbaImport = brregWebEnheter; //store them all
                     mergeRecord.urbalurbaVerified = BRREG_MANY;
+                    mergeRecord.urbalurbaError = "Search for hjemmeside=" + hjemmeside + " resulted in:" + totalElements + " organizations";
                 } else {// there are none
                     // the search is sending bullshit back to us
                     // not sure what to do 
-                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning where NONE has correct hjemmeside !!")
+                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning:" + totalElements +  " .NONE of them has correct hjemmeside !!");
+                    mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " is returning:" + totalElements +  " .NONE of them has correct hjemmeside !!";
                     debugger;
                 }
 
@@ -1392,10 +1433,10 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
         mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
 
 
-        //copy field: "hjemmeside" --> "url" and add http://
+        //copy field: "hjemmeside" --> "web" and add http://
         tmpResult = getNested(oneBrregOrg, "hjemmeside");
         if (tmpResult) { // its there
-            mergeRecord.url = addWebProtocol(tmpResult);
+            mergeRecord.web = addWebProtocol(tmpResult);
         }
 
 
@@ -1464,6 +1505,7 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
         // there is just one
         tmpResult = getNested(oneBrregOrg, "organisasjonsform", "kode");
         if (tmpResult) { // its there        
+            tmpResult = tmpResult.toLowerCase();
             mergeRecord.categories.organisasjonsform.push(tmpResult);
         }
 
@@ -1477,8 +1519,8 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
         }
 
     } else { // we dont have a oneBrregOrg
-        let totalElements = getNested(brregRecord, "page", "totalElements");
-        mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " resulted in:" + totalElements + " organizations";
+        //let totalElements = getNested(brregRecord, "page", "totalElements");
+        //mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " resulted in:" + totalElements + " organizations";
 
     }
 
