@@ -2913,8 +2913,8 @@ export async function readNetworksFromInsightly() {
         currentEntityStrapiRecord.idName = string2IdKey(networkName);
         //TODO: verify that there is a networkName
         let networkMemberTypes = await getInsightlyCustomField("networkMemberTypes", currentIinsightlyNetworkOrganizationRecord);
-
-        currentEntityStrapiRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
+        
+        if (networkMemberTypes) currentEntityStrapiRecord.networkMemberTypes = JSON.parse(networkMemberTypes);        
 
 
         returnArray.push(currentEntityStrapiRecord);
