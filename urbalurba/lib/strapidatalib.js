@@ -12,10 +12,10 @@ export const STRAPIURI = process.env.NEXT_PUBLIC_STRAPIURI || "https://strapi.ur
 
 
 import { initializeApollo } from '../apollo/apolloClient.js'
-import slugify from "slugify"
+
 
 import {
-  getIconImage, getProfileImage, getCoverImage, getSquareImage, getNested,
+  getIconImage, getProfileImage, getCoverImage, getSquareImage, getNested, string2IdKey,
   URL_SEPARATOR, ORGANIZATION_ENTITYTYPE, DEFAULT_PARENT_IDNAME
 } from "./urbalurbalib2.js";
 
@@ -1597,52 +1597,6 @@ export async function getEntityAll() {
 
 
 
-
-/** string2IdKey
-* idKey: convert to string if its not
-* idKey: set to lowecase
-* idKey: starting and tailing space will be removed
-* idKey: remove special chars
-* idKey: spaces will be replaced with - 
-*/
-export function string2IdKey(idKey) {
-  var orginalidKey = idKey;
-
-  if (idKey) {
-
-    if (!typeof idKey === 'string') {
-      idKey = String(idKey); //convert to string if its not
-    }
-    idKey = idKey.toLowerCase(); //maks sure it is lowercase
-    idKey = idKey.trim(); // remove starting and tailing spaces    
-    idKey = idKey.replace(/\s+/g, '-'); //replace spaces with -
-    // replace norwegian letters
-    idKey = idKey.replace(/æ/g, 'ae');
-    idKey = idKey.replace(/ø/g, 'o');
-    idKey = idKey.replace(/å/g, 'a');
-
-
-    // old one idKey = slugify(idKey); 
-
-    idKey = slugify(idKey, {
-      replacement: '-',  // replace spaces with replacement character, defaults to `-`
-      remove: /[*+~()'"!:@,/]/g, // remove characters that match regex, defaults to `undefined`
-      lower: true,      // convert to lower case, defaults to `false`
-      strict: false,     // strip special characters except replacement, defaults to `false`
-      locale: 'no'       // language code of the locale to use
-    });
-
-
-    if (orginalidKey != idKey) {
-      // console.log("LIB/formatIdKey ==> CHANGED orginalidKey -", orginalidKey, "- to -", idKey, "-");
-    }
-
-  } else { //idKey is null, undefined or something
-    //console.error("string2IdKey empty!!")
-    idKey = ""; //return empty string.
-  }
-  return idKey
-}
 
 
 

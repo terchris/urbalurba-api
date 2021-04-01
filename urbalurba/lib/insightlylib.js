@@ -12,7 +12,7 @@ import {
     getEntityCategoryAnswerIDByCategoryIDandCategoryitemIdName, createEntityCategoryAnswer,
     getCategoryitemIDByIdNameAndCategoryID,
     makeEntityMemberOfNetwork, getAllNetworksList,
-    string2IdKey, prefixArrayObjects,
+    prefixArrayObjects,
     getAllStrapiPersonsInsightlyForeignKey, createPerson, updatePerson,
     createPersonEntityRole, updatePersonEntityRole, getPersonEntityRoleIDByEntityIDandPersonID,
     getEntityNetworkMembershipIDbyIdNames,
@@ -22,7 +22,7 @@ import {
 
 
 import {
-    replaceItemInArray, filterArray,
+    replaceItemInArray, filterArray, name2UrbalurbaIdName, string2IdKey
 } from "./urbalurbalib2.js";
 
 
@@ -42,6 +42,7 @@ import {
     getApifyResultArray, startApifyTask,
     getScrapedURL, getScrapedPhone, createApifyUrlList
 } from "./apifylib.js";
+
 
 
 
@@ -2884,7 +2885,7 @@ async function getAllInsightlyNetworks() {
 
 /** readNetworksFromInsightly
  * reads all organizations marked as networks from insightly 
- * and converts them to network records. 
+ * and converts them to merge records and add network fields. 
  * Returns an array of network records - or an empty array if there are none
  */
 
@@ -2901,23 +2902,21 @@ export async function readNetworksFromInsightly() {
     for (let i = 0; i < insightlyAllNetworkOrganizations.length; i++) {
         let currentIinsightlyNetworkOrganizationRecord = insightlyAllNetworkOrganizations[i];
 
-        // first we convert the org to a strapi org
-        let currentEntityStrapiRecord = insightly2strapiEntityRecord(currentIinsightlyNetworkOrganizationRecord, entitytypeID);
 
-        //then convert it to a interchange entity record
-        currentEntityStrapiRecord.entitytype = null; // the strapi2interchangeEntityRecord expect a object here - we dont have it as insightly does not provide it
-        currentEntityStrapiRecord = strapi2interchangeEntityRecord(currentEntityStrapiRecord);
+        let currentMergeRecord = insightly2mergeRecord(currentIinsightlyNetworkOrganizationRecord);
 
         //then we need to extract the network specific fields
         let networkName = await getInsightlyCustomField("NetworkName", currentIinsightlyNetworkOrganizationRecord);
-        currentEntityStrapiRecord.idName = string2IdKey(networkName);
-        //TODO: verify that there is a networkName
+        if (networkName) {
+            currentMergeRecord.idName = string2IdKey(networkName); //here we are changing the ID - so incase they have different ID' that is possible
+        }
+
         let networkMemberTypes = await getInsightlyCustomField("networkMemberTypes", currentIinsightlyNetworkOrganizationRecord);
-        
-        if (networkMemberTypes) currentEntityStrapiRecord.networkMemberTypes = JSON.parse(networkMemberTypes);        
+
+        if (networkMemberTypes) currentMergeRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
 
 
-        returnArray.push(currentEntityStrapiRecord);
+        returnArray.push(currentMergeRecord);
     }
 
     return returnArray;
@@ -3435,3 +3434,262 @@ export async function insightlyOrganizationArrayUpdate(insightlyOrganizationsArr
 
 }
 
+/** insightly2mergeRecord
+ takes a insightly record and transforms it to a merge record 
+ This one should replace the various transformations
+
+see doc for insightly2strapiEntityRecord
+ */
+export function insightly2mergeRecord(insightlyRecord) {
+    let mergeRecord = {};
+
+    let socialLinks = {};
+
+    mergeRecord.idName = getInsightlyCustomField("CKAN_NAME", insightlyRecord).toString();
+    // we also need to make sure the idName is a legal idName
+    mergeRecord.idName = string2IdKey(mergeRecord.idName);
+    mergeRecord.urbalurbaScrapeDate = new Date().toISOString();
+
+    if (mergeRecord.idName != "") {
+        mergeRecord.domain = mergeRecord.idName; // this is how its is defined - the domain is the id
+        //mergeRecord.entitytype = entitytypeID,
+        mergeRecord.displayName = insightlyRecord.ORGANISATION_NAME.toString();
+        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
+
+
+        mergeRecord.slogan = getInsightlyCustomField("slogan", insightlyRecord);
+        mergeRecord.summary = getInsightlyCustomField("summary", insightlyRecord);
+        mergeRecord.description = insightlyRecord.BACKGROUND;
+        mergeRecord.web = insightlyRecord.WEBSITE;
+        mergeRecord.phone = insightlyRecord.PHONE;
+        mergeRecord.email = getInsightlyCustomField("ORGANIZATION_EMAIL", insightlyRecord);
+        mergeRecord.location = {
+            "visitingAddress": {
+                "street": insightlyRecord.ADDRESS_SHIP_STREET,
+                "city": insightlyRecord.ADDRESS_SHIP_CITY,
+                "postcode": insightlyRecord.ADDRESS_SHIP_POSTCODE,
+                "country": insightlyRecord.ADDRESS_SHIP_COUNTRY
+            },
+            "adminLocation": {
+                "countyName": getInsightlyCustomField("LOCATION_FYLKENAVN", insightlyRecord).toString(),
+                "countyId": getInsightlyCustomField("LOCATION_FYLKENUMMER", insightlyRecord).toString(),
+                "municipalityId": getInsightlyCustomField("LOCATION_KOMMUNENUMMER", insightlyRecord).toString(),
+                "municipalityName": getInsightlyCustomField("LOCATION_KOMMUNENAVN", insightlyRecord).toString()
+            }
+        };
+
+
+        mergeRecord.organizationNumber = getInsightlyCustomField("Organisasjonsnummer", insightlyRecord).toString();
+        mergeRecord.sbn_insightly = insightlyRecord.ORGANISATION_ID.toString();
+
+
+        mergeRecord.domains = insightlyGetEmailDomains(insightlyRecord);
+
+
+        let lat = getInsightlyCustomField("LOCATION_LATITUDE", insightlyRecord).toString();
+        if (lat) { //we have an gps address
+            mergeRecord.location.latLng = {
+                "lat": lat,
+                "lng": getInsightlyCustomField("LOCATION_LONGITUDE", insightlyRecord).toString()
+            }
+        }
+
+
+
+        let foundedDate = getInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", insightlyRecord).toString();
+        if (foundedDate == "") { //its empty
+            foundedDate = null;
+        } else { // strapi dates are like this "2021-01-01"
+            //no need to format
+        }
+
+        let endDate = getInsightlyCustomField("BRREG_DELETE_DATE", insightlyRecord).toString();
+        if (endDate == "") { //its empty
+            endDate = null;
+        } else { // strapi dates are like this "2021-01-01"
+            //no need to format
+        }
+
+        mergeRecord.brreg = {
+            "organizationNumber": parseInt(getInsightlyCustomField("Organisasjonsnummer", insightlyRecord)),
+            "employees": parseInt(getInsightlyCustomField("BRREG_EMPLOYEES", insightlyRecord)),
+            "foundedDate": foundedDate,
+            "endDate": endDate,
+            "orgType": getInsightlyCustomField("BRREG_ORGTYPE", insightlyRecord).toString()
+
+        }
+
+
+
+
+        mergeRecord.image = {
+            "profile": getInsightlyCustomField("CKAN_LOGO_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE)
+        };
+
+
+        let coverImageURL = getInsightlyCustomField("COVER_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        if (coverImageURL != "") {
+            mergeRecord.image.cover = coverImageURL
+        }
+
+        let iconImageURL = getInsightlyCustomField("ICON_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        if (iconImageURL != "") {
+            mergeRecord.image.icon = iconImageURL
+        }
+
+        let squareImageURL = getInsightlyCustomField("SQUARE_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        if (squareImageURL != "") {
+            mergeRecord.image.square = squareImageURL
+        }
+
+
+
+        mergeRecord.insightlyTags = string2array(insightlyGetTags(insightlyRecord));
+
+        mergeRecord.categories = {}; //empty
+
+
+
+        let tmpTag = string2array(getInsightlyCustomField("member_tags", insightlyRecord).replace(/;/g, ',')); //the .replace changes ; to ,
+        let tmpSector = orgType2array(getInsightlyCustomField("organization_type", insightlyRecord));
+        let tmpSdg = string2array(getInsightlyCustomField("Sustainable_Development_Goals", insightlyRecord).replace(/;/g, ','));
+        let tmpIndustry = string2array(getInsightlyCustomField("organization_segments", insightlyRecord).replace(/;/g, ','));
+        let tmpChallenge = string2array(getInsightlyCustomField("problems_solved", insightlyRecord).replace(/;/g, ','));
+
+        //next thing to do is to convert all categories and tags to valid idName's
+        // eg the challenge contains "Enhanced data collection" this must be converted to "enhanced-data-collection"
+
+
+        //we are only going to add .categories that has values 
+        if (tmpTag != "") {
+            mergeRecord.categories.tag = convertCategoryitems2Keys(tmpTag);
+        }
+        if (tmpSector != "") {
+            mergeRecord.categories.sector = convertCategoryitems2Keys(tmpSector);
+        }
+        if (tmpSdg != "") {
+            mergeRecord.categories.sdg = convertCategoryitems2Keys(tmpSdg);
+        }
+        if (tmpIndustry != "") {
+            mergeRecord.categories.industry = convertCategoryitems2Keys(tmpIndustry);
+        }
+        if (tmpChallenge != "") {
+            mergeRecord.categories.challenge = convertCategoryitems2Keys(tmpChallenge);
+        }
+
+
+
+
+
+        //in my dyslectic rambelings I have missspelled water as wather
+        if (tmpIndustry != "") {
+            mergeRecord.categories.industry = replaceItemInArray("wather", "water", mergeRecord.categories.industry);
+        }
+
+
+        // the insightlyRecord.BACKGROUND is null if empty - make it an empty string
+        if (insightlyRecord.BACKGROUND == null)
+            mergeRecord.description = "";
+
+
+        // the insightlyRecord.WEBSITE is null if empty - make it an empty string
+        if (insightlyRecord.WEBSITE == null)
+            mergeRecord.url = "";
+
+
+        // the insightlyRecord.PHONE is null if empty - make it an empty string
+        if (insightlyRecord.PHONE == null)
+            mergeRecord.phone = "";
+
+
+        // if we do not have a valid address then we set the address to Å in Røst municipality
+        if (insightlyRecord.ADDRESS_SHIP_STREET == null || insightlyRecord.ADDRESS_SHIP_CITY == null || insightlyRecord.ADDRESS_SHIP_POSTCODE == null || insightlyRecord.ADDRESS_SHIP_COUNTRY == null) {
+            mergeRecord.location = {
+                "visitingAddress": {
+                    "street": "Å vegen 5",
+                    "city": "Sørvågen",
+                    "postcode": "8392",
+                    "country": "Norway"
+                }
+            }
+        }
+
+
+
+
+        //Insightly organization is not using the summary field yet. So copy the description field for now
+        if (mergeRecord.summary == "")
+            mergeRecord.summary = mergeRecord.description.substring(0, FIELD_SUMMARY_MAXCHAR);
+
+        // the summary cannot be empty. In Insightly that might be the case. So fix it
+        if (mergeRecord.summary == "") {
+            console.log("empty description/summary field in Insightly for: ", mergeRecord.idName);
+            mergeRecord.summary = "missing text";
+        }
+
+
+        // adding temp fields to strapiRecord that will be used to figure out if the og has ben updated 
+        // strapiCreatedDate holds just the date so that it can be written to strapi 
+        mergeRecord.insightlyDateFields = {
+            "DATE_CREATED_UTC": insightlyRecord.DATE_CREATED_UTC,
+            "DATE_UPDATED_UTC": insightlyRecord.DATE_UPDATED_UTC
+        }
+
+
+        // also add social fields to be synced
+        if (insightlyRecord.SOCIAL_LINKEDIN) {
+            socialLinks.linkedin = insightlyRecord.SOCIAL_LINKEDIN
+        }
+
+        if (insightlyRecord.SOCIAL_FACEBOOK) {
+            socialLinks.facebook = insightlyRecord.SOCIAL_FACEBOOK
+        }
+
+        if (insightlyRecord.SOCIAL_TWITTER) {
+            socialLinks.twitter = insightlyRecord.SOCIAL_TWITTER
+        }
+
+        let insightlyInstagram = getInsightlyCustomField("SOCIAL_INSTRAGRAM", insightlyRecord);
+        if (insightlyInstagram != "") {
+            socialLinks.instagram = insightlyInstagram
+        }
+
+        let insightlyYoutube = getInsightlyCustomField("SOCIAL_YOUTUBE", insightlyRecord);
+        if (insightlyYoutube != "") {
+            socialLinks.youtube = insightlyYoutube
+        }
+
+
+
+        //if there are no social links, then we set socialLinks= null othwevise we ass the socialLinks object
+        if (Object.keys(socialLinks).length === 0 && socialLinks.constructor === Object)
+            mergeRecord.socialLinks = null;
+        else
+            mergeRecord.socialLinks = socialLinks;
+
+
+        //Get the insightly tags
+        let insightlyTagString = insightlyGetTags(insightlyRecord);
+        // convet to array 
+        let insightlyTagArray = string2array(insightlyTagString);
+        //copy only the array items that starts with INSIGHTLY_NETWORKTAGCHAR
+        let insightlyNetworksArray = filterArray(INSIGHTLY_NETWORKTAGCHAR, insightlyTagArray)
+        // then return the result
+        mergeRecord.networkmemberships = insightlyNetworksArray;
+
+        // get and copy the tags that the members added
+        let insightlyMemberTags = getInsightlyCustomField("member_tags", insightlyRecord).toString();
+        mergeRecord.tags = string2array(insightlyMemberTags);
+
+
+
+
+    } else
+        console.log("Cannot import ", insightlyRecord.ORGANISATION_NAME, " Missing CKAN_NAME");
+
+
+
+
+    return mergeRecord;
+
+}

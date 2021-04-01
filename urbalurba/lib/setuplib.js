@@ -10,13 +10,13 @@ import {
     getNetworkEntitytypeCategoryByNetworkEntitytypeIDandCategoryID, createNetworkEntitytypeCategory, updateNetworkEntitytypeCategory,
     getAllEntitiesList, createEntity, updateEntity, getEntityIDByIdName,
     createEntityParents,
-    prefixArrayObjects, string2IdKey, getSocialLinks,
+    prefixArrayObjects, getSocialLinks,
     interchange2strapiEntityRecord, getEntityCategoryIDByIdName, getCategoryitemIDByIdNameAndCategoryID, getEntityCategoryAnswerIDByCategoryIDandCategoryitemIdName, createEntityCategory, createEntityCategoryAnswer, updateEntityCategoryAnswer, makeEntityMemberOfAllNetworks, interchangeImage2StrapiImage
 } from "./strapidatalib.js";
 
 
 import {
-    getNested, URL_SEPARATOR, ORGANIZATION_ENTITYTYPE
+    getNested, string2IdKey, URL_SEPARATOR, ORGANIZATION_ENTITYTYPE
 } from "./urbalurbalib2.js";
 
 import {

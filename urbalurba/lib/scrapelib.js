@@ -8,8 +8,7 @@
 
 import axios from 'axios';
 
-import { string2IdKey } from "./strapidatalib.js";
-import { getNested } from "./urbalurbalib2.js";
+import { getNested, name2UrbalurbaIdName, string2IdKey } from "./urbalurbalib2.js";
 
 
 const MERGE_DATASET = "merges";
@@ -484,13 +483,14 @@ async function getFirstReadyNetwork(config) {
 
 }
 
-/** createEntities
- * gets the first scanned memberlist that is Ready.
- * creates en entry for each member 
- * returns false if there are no more networks that we can split into entries.
+/** splitNetwork2organizations
+ Gets the first network that is ready. Then creates all organizations for this network.
+ Sets the status for the first network to "Running" while creating the organizations. 
+ And "Finished" when all organizations are created.
+ returns false if there are no more networks that we can split into entries.
  */
 
-export async function createEntities(config) {
+export async function splitNetwork2organizations(config) {
 
     let moreReadyNetworks = true; // there might be more networks to split
     let firstNetwork = await getFirstReadyNetwork(config);
@@ -511,95 +511,16 @@ export async function createEntities(config) {
 
             // loop all members in the list and create one mergeRecord for each member
             let members = firstNetwork.data[config.DATA_SECTION_INPUT][jobName];
-            for (let member = 0; member < members.length; member++) {
-                let idName = members[member].domain;
-                if (idName) {
-                    let existingMergeRecordArray = await getMergesByIdNameANDentitytype(config, idName, config.ENTITYTYPE_OUTPUT);
-                    if (existingMergeRecordArray.length == 0) { // there is no previous record      
 
-                        let newData = {};
-                        newData[config.DATA_SECTION_OUTPUT] = {};
-                        newData[config.DATA_SECTION_OUTPUT][jobName] = members[member];
 
-                        // get all the top level ID's
-                        let urbalurbaIdName = members[member].urbalurbaIdName;
-                        let organizationNumber = members[member].organizationNumber;
-                        let sbn_insightly = members[member].sbn_insightly;
-                        let domain = members[member].domain;
-                        let web = members[member].web;
-                        web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
-
-                        let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
-                        if (createResult == "none") { // there is was an error
-                            console.error("createEntities: (" + member + ") idName:" + idName + " Error creating");
-                        } else {
-                            console.log("createEntities: (" + member + ") idName:" + idName + " Created");
-                        }
-                    } else {
-                        console.log("createEntities: (" + member + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
-
-                        let updatedData = existingMergeRecordArray[0].data; // there should be only one - pick the first one                    
-                        updatedData[config.DATA_SECTION_OUTPUT][jobName] = members[member]
-
-                        // get all the top level ID's
-                        let urbalurbaIdName = "";
-                        if (existingMergeRecordArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
-                            urbalurbaIdName = existingMergeRecordArray[0].urbalurbaIdName; //keep the initial 
-                        } else {
-                            urbalurbaIdName = members[member].urbalurbaIdName; //if not take the one from the new data
-                        }
-
-                        let organizationNumber = "";
-                        if (existingMergeRecordArray[0].organizationNumber) { // we have a organizationNumber
-                            organizationNumber = existingMergeRecordArray[0].organizationNumber; // keep the initial
-                        } else { // we take whatever is here
-                            organizationNumber = members[member].organizationNumber;
-                        }
-
-                        let sbn_insightly = "";
-                        if (existingMergeRecordArray[0].sbn_insightly) { // we have a insightly ID
-                            sbn_insightly = existingMergeRecordArray[0].sbn_insightly; // keep the initial
-                        } else { // we take whatever is here
-                            sbn_insightly = members[member].sbn_insightly;
-                        }
-
-                        let domain = "";
-                        if (existingMergeRecordArray[0].domain) { // we have a domain
-                            domain = existingMergeRecordArray[0].domain; // keep the initial
-                        } else { // we take whatever is here
-                            domain = members[member].domain;
-                        }
-
-                        let web = "";
-                        if (existingMergeRecordArray[0].web) { // we have a domain
-                            web = existingMergeRecordArray[0].web; // keep the initial
-                        } else { // we take whatever is here
-                            web = members[member].web;
-                        }
-                        web = addWebProtocol(web);
-
-                        let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog);
-                        if (updateResult == "none") { // there is was an error
-                            console.error("createEntities: Error cannot update idName=" + idName);
-                        } else {
-                            console.log("createEntities: Updated idName=" + idName);
-                        }
-
-                    }
-
-                } else {
-                    console.log("createEntities: (" + member + ")No idName:" + idName + " skipping");
-                }
-
-            }
-
+            let numUpdated = await updateMergeOrganizations(config,members); 
 
             // Finished updating - now we mark it finished
             statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
 
 
         } else {
-            console.error("createEntities: we are in a shit of trouble");
+            console.error("splitNetwork2organizations: we are in a shit of trouble");
             debugger;
         }
 
@@ -611,7 +532,7 @@ export async function createEntities(config) {
 
 
     } else {
-        console.log("createEntities: No ready member lists");
+        console.log("splitNetwork2organizations: No ready member lists");
         moreReadyNetworks = false; // we now know thatthere are no more ready networks to split
     }
 
@@ -786,70 +707,12 @@ export async function pageImages2Array($) {
 
 }
 
-/** companyName2displayName
- takes a company name and removes AS or ASA eg "Fjordkraft AS" becomes "Fjordkraft"
- */
-//TODO: make it smarter so that we have an aray of teksts - add "IKS"
-function companyName2displayName(companyName) {
-
-
-    const removeEndings = [
-        " ASA",
-        " AS",
-        " AB",
-        " IKS"
-    ];
-
-    let tmpCompanyName = ""
-    let pos = 0;
-    companyName = companyName.trim(); //no spaces in beginning or end
-    tmpCompanyName = companyName.toUpperCase();
-
-
-    for (let i = 0; i < removeEndings.length; i++) {
-
-        if (tmpCompanyName.endsWith(removeEndings[i])) {
-            pos = tmpCompanyName.lastIndexOf(removeEndings[i]);
-            if (-1 != pos) {
-                companyName = companyName.slice(0, pos);
-                tmpCompanyName = tmpCompanyName.slice(0, pos);
-                break; // stop looping
-            }
-        }
-
-
-    }
-
-
-
-
-    companyName = companyName.trim();
-    return companyName;
-
-}
 
 
 
 
 
 
-
-/** name2UrbalurbaIdName
-takes a name and converts it to a urbalurba idName
-returns a idName 
-
- */
-export function name2UrbalurbaIdName(displayName) {
-
-
-    displayName = companyName2displayName(displayName); //make sure there are no AS / ASA
-
-    displayName = string2IdKey(displayName);
-
-
-    return displayName;
-
-}
 
 
 
@@ -901,38 +764,15 @@ export async function getJobArray_web(config, jobName) {
             let mergeRecord = jobArray[i];
 
 
-            // we must look at all the memberships for one entry and see if here is a web property. If there is more than one -- what then ?
-            let membershipArray = Object.getOwnPropertyNames(mergeRecord.data[config.DATA_SECTION_INPUT]); //get list of all memberships
-
-            for (let prop = 0; prop < membershipArray.length; prop++) { // loop all memberships 
-                let name = membershipArray[prop];
-                let currentMembership = mergeRecord.data[config.DATA_SECTION_INPUT][name];
-                let web = getNested(currentMembership, "web"); // get value of property web - if there is one
-                if (web) { // web has a value
-                    console.log("getJobArray_web: (" + i + ") idName:" + mergeRecord.idName + " web:" + web + " found");
-                    // there is a posibility that the web address does not contain http:// or https://        
-                    if ((-1 == web.search("http://")) && (-1 == web.search("https://"))) {
-                        web = "http://" + web; //just add http
-                    }
-
-                    let webObject = {
-                        url: web,
-                        userData: {
-                            domain: mergeRecord.idName,
-                            id: mergeRecord.id,
-                            jobLog: mergeRecord.jobLog
-                        }
-                    }
-
-
-                    // we should now have a web - skip looping the rest f the memberships for this entity
-                    returnJobArray.push(webObject);
-                    break; // stop looping/looking for other web properties for this 
-
+            let webObject = {
+                url: mergeRecord.web,
+                userData: {
+                    domain: mergeRecord.idName,
+                    id: mergeRecord.id,
+                    jobLog: mergeRecord.jobLog
                 }
-
-
-            }
+            };
+            returnJobArray.push(webObject);
 
 
         }
@@ -1130,35 +970,35 @@ export async function maestro(config) {
     ];
 
 
-    let finishedJobArray = [];
-    let totQued =0;
+    let jobs2processArray = [];
+    let totQued = 0;
 
     for (let i = 0; i < jobList.length; i++) { // loop the list of job types
 
-        finishedJobArray = await getMergesByJobANDjobStatus(config, jobList[i].previousJobName, jobList[i].getJobStatus);
+        jobs2processArray = await getMergesByJobANDjobStatus(config, jobList[i].previousJobName, jobList[i].getJobStatus);
 
-        for (let readyJob = 0; readyJob < finishedJobArray.length; readyJob++) { //loop the ready jobs
+        for (let readyJob = 0; readyJob < jobs2processArray.length; readyJob++) { //loop the ready jobs
 
-
+            // special handling of job 2. Depending on wether we have organizationNumber or not
             if (jobList[i].number == 2) { // after web-info we must do one of two lookups depending on if we have a org number or not
-                if (finishedJobArray[readyJob].organizationNumber ) { // if we have a org num
-                    let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, "brreg-orgnum", jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
-                    console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-orgnum");
+                if (jobs2processArray[readyJob].organizationNumber) { // if we have a org num
+                    let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "brreg-orgnum", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
+                    console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-orgnum");
                     totQued++;
                 } else { //there is no orgnum - we will try using web 
-                    let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, "brreg-web", jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
-                    console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-web");
+                    let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "brreg-web", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
+                    console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-web");
                     totQued++;
                 }
             } else { // it is not job number 2
-                let setJobResult = await setJobStatus(config, finishedJobArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, finishedJobArray[readyJob].jobLog);
-                console.log("maestro: (" + readyJob + ") idName:" + finishedJobArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
+                let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
+                console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
                 totQued++;
             }
 
 
         }
-        if (finishedJobArray.length > 0) { // if there was stuff to be processed - then
+        if (jobs2processArray.length > 0) { // if there was stuff to be processed - then
             console.log("maestro: starting  nextJobName:" + jobList[i].nextJobName); //send signal to start the nextJob
         }
 
@@ -1169,7 +1009,7 @@ export async function maestro(config) {
 
 
 
-return "Total queued is: " + totQued;
+    return "Total queued is: " + totQued;
 
 
 
@@ -1391,8 +1231,8 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
                 } else {// there are none
                     // the search is sending bullshit back to us
                     // not sure what to do 
-                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning:" + totalElements +  " .NONE of them has correct hjemmeside !!");
-                    mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " is returning:" + totalElements +  " .NONE of them has correct hjemmeside !!";
+                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!");
+                    mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!";
                     debugger;
                 }
 
@@ -1528,4 +1368,484 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
     return mergeRecord;
 
 }
+/** member2mergeRecord
+ the data or one member (memberData) needs to be split into two parts
+ The data that is info goes into info: {} and the data that describes the membership goes into memberships:
+ Returns a data record that can be written to the database.
+ The full memberData is copied to the field urbalurbaImport 
+ */
+function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
 
+    let returnData = {};
+    let infoData = {};
+    let membershipsData = {};
+    let urbalurbaImportData = {}; //this is where we store all fields that are not known
+    let tmpResult;
+
+    const INFOFIELDSARRAY = [
+        "idName",
+        "displayName",
+        "slogan",
+        "summary",
+        "description",
+        "web",
+        "phone",
+        "domains",
+        "image",
+        "location",
+        "status",
+        "socialLinks",
+        "externalLinks",
+        "brreg",
+        "email",
+
+        "sbn_insightly",
+        "organizationNumber",
+
+        //entitytype      
+        "domain",
+
+
+        "categories",
+        "urbalurbaScrapeDate",
+        "urbalurbaIdName"
+
+    ];
+    const MEMBERSHIPFIELDSARRAY = [
+        "networkIdName",
+        "networkmemberships",
+        "networkMemberTypes",
+        "urbalurbaScrapeDate"
+
+    ];
+    const DELETEFIELDSARRAY = [
+        "tags",
+        "insightlyTags"
+    ];
+
+    // first thing. We need to persist the existing data. And we do not know what is there so we copy it
+
+    returnData = existingData; //do we nee to copy or can we just do this?
+
+
+
+
+    // check if there nessesery fields are there. If not we create them
+    tmpResult = getNested(returnData, INFO); // check the INFO
+    if (!tmpResult) { // its data in the INFO
+        returnData[INFO] = {}; // create the INFO
+    }
+
+    tmpResult = getNested(returnData, MEMBERSHIPS); // check the MEMBERSHIPS
+    if (!tmpResult) { // its data in the MEMBERSHIPS
+        returnData[MEMBERSHIPS] = {}; // create the MEMBERSHIPS
+    }
+
+
+    // so now we have preserved what was there.
+
+    let foundIndex; // for searching 
+    let newDataFieldNames = Object.getOwnPropertyNames(newData); //get list of all properties 
+    // then we need to delete fields that we dont want into merge
+
+    for (let prop = 0; prop < newDataFieldNames.length; prop++) { // loop all properties 
+        let fieldName = newDataFieldNames[prop];
+
+        foundIndex = DELETEFIELDSARRAY.findIndex(infoField => infoField == fieldName); //look for the fieldname in the 
+        if (foundIndex >= 0) { // its a known field
+            delete newData[fieldName]; // delete the field
+        } else { // do nothing
+        }
+
+    }
+
+    // next is to start copying fields into INFO - we do a replac
+    // then we store the known INFO fields and put the not know in urbalurbaImport
+    newDataFieldNames = Object.getOwnPropertyNames(newData); //get list of all properties 
+    for (let prop = 0; prop < newDataFieldNames.length; prop++) { // loop all properties 
+        let fieldName = newDataFieldNames[prop];
+
+        foundIndex = INFOFIELDSARRAY.findIndex(infoField => infoField == fieldName); //look for the fieldname in the 
+        if (foundIndex >= 0) { // its a known field
+            infoData[fieldName] = getNested(newData, fieldName); // get the field and store it in the infoData
+        } else { // the field should not be in info - lets see if it is supposed to go in memberships
+
+            foundIndex = MEMBERSHIPFIELDSARRAY.findIndex(infoField => infoField == fieldName); //look for the fieldname in the 
+            if (foundIndex >= 0) { // its in membership
+                // skipping it 
+            } else { // unknown field                
+                urbalurbaImportData[fieldName] = getNested(newData, fieldName); // get the field and store it in the urbalurbaImport
+            }
+                
+        }
+
+    }
+
+    // now we copy the fields that should be in the memberships
+    for (let prop = 0; prop < newDataFieldNames.length; prop++) { // loop all properties 
+        let fieldName = newDataFieldNames[prop];
+
+        foundIndex = MEMBERSHIPFIELDSARRAY.findIndex(infoField => infoField == fieldName); //look for the fieldname in the 
+        if (foundIndex >= 0) { // its a known field
+            membershipsData[fieldName] = getNested(newData, fieldName); // get the field and store it in the infoData
+        } else { // unknown field
+            // skipping it 
+        }
+
+    }
+
+    // now we have the old data. And the new data is split into 3 parts
+
+
+
+    // put the info data in place
+    returnData[INFO][jobName] = infoData;
+    // put the fields that is not known in the urbalurbaImport
+    returnData[INFO][jobName].urbalurbaImport = urbalurbaImportData;
+    // put the membership in place
+    returnData[MEMBERSHIPS][jobName] = membershipsData;
+
+
+
+
+    return returnData;
+
+}
+
+
+
+
+
+
+/* updateMergeNetworks
+updates networks or create them if they do not exist.
+takes networkData as parameter. Returns the number of networks imported
+*/
+export async function updateMergeNetworks(config, mergeNetworkArray) {
+
+    let netCounter = 0;
+
+    let currentMergeNetworkRecord;
+
+    let entitytype = config.ENTITYTYPE_OUTPUT;
+    let jobStatus = config.JOBSTATUS_OUTPUT;
+    let jobName = config.JOBNAME;
+
+    let organizationNumber = null;
+    let urbalurbaIdName = null;
+    let sbn_insightly = null;
+    let domain = null;
+    let web = null;
+
+    for (netCounter = 0; netCounter < mergeNetworkArray.length; netCounter++) {
+
+
+        currentMergeNetworkRecord = mergeNetworkArray[netCounter];
+        currentMergeNetworkRecord.idName = string2IdKey(currentMergeNetworkRecord.idName); //make sure its a valid idName
+
+        let idName = currentMergeNetworkRecord.idName;
+
+
+
+
+
+        console.log("updateMergeNetworks: (" + netCounter + ") network idName:", idName)
+
+        let mergeArray = await getMergesByIdNameANDentitytype(config, idName, entitytype);
+        if (mergeArray.length == 0) { // there is no previous record
+
+
+            let newData = {};
+
+            // split the information about a network into two parts. One "info" part and one "membership" part
+            const INFO = "info";
+            const MEMBERSHIPS = "categories";
+            newData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, currentMergeNetworkRecord, newData);
+
+            // get all the top level ID's
+            urbalurbaIdName = currentMergeNetworkRecord.urbalurbaIdName; //assume there is
+            organizationNumber = currentMergeNetworkRecord.organizationNumber; //assume there is        
+            sbn_insightly = currentMergeNetworkRecord.sbn_insightly; //assume there is
+            domain = currentMergeNetworkRecord.domain; //assume there is
+            web = currentMergeNetworkRecord.web; //assume there is
+            web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
+
+            let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
+
+            if (mergeRecord == "none") { // there is was an error
+                console.error("updateMergeNetworks: Error creating network for:" + idName);
+                debugger;
+            } else {
+                console.log("updateMergeNetworks: Created network for:" + idName);
+                
+            }
+
+
+
+        } else { // there is a previous merge record - we will update it
+
+            console.log("updateMergeNetworks: idName:" + idName + " already has entitytype=" + entitytype);
+
+
+            // split the information about a network into two parts. One "info" part and one "membership" part
+            let existingData = mergeArray[0].data; // there should be only one - pick the first one                    
+            const INFO = "info";
+            const MEMBERSHIPS = "categories";
+            let updatedData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, currentMergeNetworkRecord, existingData);
+
+
+            // get all the top level ID's
+            if (mergeArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
+                urbalurbaIdName = mergeArray[0].urbalurbaIdName; //keep the initial 
+            } else {
+                urbalurbaIdName = currentMergeNetworkRecord.urbalurbaIdName; //if not take the one from the new data
+            }
+
+
+
+            if (mergeArray[0].organizationNumber) { // we have a organizationNumber
+                organizationNumber = mergeArray[0].organizationNumber; // keep the initial
+            } else { // we take whatever is here
+                organizationNumber = currentMergeNetworkRecord.organizationNumber;
+            }
+
+
+
+            if (mergeArray[0].sbn_insightly) { // we have a insightly ID
+                sbn_insightly = mergeArray[0].sbn_insightly; // keep the initial
+            } else { // we take whatever is here
+                sbn_insightly = currentMergeNetworkRecord.sbn_insightly;
+            }
+
+            if (mergeArray[0].domain) { // we have a domain
+                domain = mergeArray[0].domain; // keep the initial
+            } else { // we take whatever is here
+                domain = currentMergeNetworkRecord.domain;
+            }
+
+            if (mergeArray[0].web) { // we have a web
+                web = mergeArray[0].web; // keep the initial
+            } else { // we take whatever is here
+                web = currentMergeNetworkRecord.web;
+            }
+
+            let updateMergeRecordResult = await updateMerge(config, updatedData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog);
+
+            if (updateMergeRecordResult == "none") { // there is was an error
+                console.error("updateMergeNetworks: Error updating network for:" + idName);
+                debugger;
+            } else {
+                console.log("updateMergeNetworks: Updated network for:" + idName);
+            }
+
+
+        }
+
+
+    }
+    console.log("updateNetworks finished. Processed total :", netCounter);
+    return netCounter;
+};
+
+
+
+/** strapi2mergeRecord
+ convers a strapi record to a merge record. 
+ This is done so that all programs that put data into the merge record uses the same attributes
+ 
+ The following field must be changed:
+ 
+copy field: "idName" --> "domain" 
+copy field: "url" --> "web"
+copy field: foreignKeys.organisasjonsnummer --> "organizationNumber"
+copy field: foreignKeys.sbn_insightly --> "sbn_insightly"
+copy field: internalImage.profile.url --> "image.profile"
+copy field: internalImage.cover.url --> "image.cover"
+copy field: internalImage.square.url --> "image.square"
+create field: urbalurbaIdName: name2UrbalurbaIdName(displayName)
+create field: urbalurbaScrapeDate 
+create field: networkIdName 
+ */
+function strapi2mergeRecord(strapiRecord) {
+
+
+    let tmpResult;
+
+    strapiRecord.domain = strapiRecord.idName;
+    strapiRecord.web = strapiRecord.url;
+    delete strapiRecord.url; // after moving we delete it
+
+
+
+    tmpResult = getNested(strapiRecord, "foreignKeys", "organisasjonsnummer");
+    if (tmpResult) {
+        strapiRecord.organizationNumber = tmpResult;
+    }
+
+    tmpResult = getNested(strapiRecord, "foreignKeys", "sbn_insightly");
+    if (tmpResult) {
+        strapiRecord.sbn_insightly = tmpResult;
+    }
+    delete strapiRecord.foreignKeys; // after moving we delete it
+
+    strapiRecord.urbalurbaScrapeDate = new Date().toISOString();
+    strapiRecord.networkIdName = config.IDNAME; // belongsto the network that imports
+
+
+
+
+
+
+
+
+    tmpResult = getNested(strapiRecord, "internalImage");
+    if (tmpResult) { // there is a attribute name internalImage
+        strapiRecord.image = {};
+
+
+        tmpResult = getNested(strapiRecord, "internalImage", "profile", "url");
+        if (tmpResult) {
+            strapiRecord.image.profile = tmpResult;
+        }
+
+        tmpResult = getNested(strapiRecord, "internalImage", "cover", "url");
+        if (tmpResult) {
+            strapiRecord.image.cover = tmpResult;
+        }
+
+        tmpResult = getNested(strapiRecord, "internalImage", "square", "url");
+        if (tmpResult) {
+            strapiRecord.image.square = tmpResult;
+        }
+
+        delete strapiRecord.internalImage; // then delete the "internalImage" prop
+
+    }
+
+    // delete other fields we dont want to export 
+    delete strapiRecord.entitytype;
+    delete strapiRecord.insightlyTags;
+    delete strapiRecord.insightlyTmpFields;
+    delete strapiRecord.tags;
+
+
+    strapiRecord.urbalurbaIdName = name2UrbalurbaIdName(strapiRecord.displayName);
+
+    return strapiRecord;
+
+}
+
+
+/** updateMergeOrganizations
+ takes a list of organizations and create/update them.
+
+ a organization record must be formatted as a mergeRecord
+ returns the number of organizations created/updated
+ */
+ export async function updateMergeOrganizations(config,mergeOrganizationsArray) {
+
+    let numUpdated =0;
+    let numCreated = 0;
+    let numError = 0;
+
+    for (let orgCounter = 0; orgCounter < mergeOrganizationsArray.length; orgCounter++) {
+        let idName = mergeOrganizationsArray[orgCounter].domain;
+        if (idName) {
+            let existingMergeRecordArray = await getMergesByIdNameANDentitytype(config, idName, config.ENTITYTYPE_OUTPUT);
+            if (existingMergeRecordArray.length == 0) { // there is no previous record      
+
+                let newData = {};
+
+                // split the information about a member into two parts. One "info" part and one "membership" part
+                const INFO = "info";
+                const MEMBERSHIPS = "memberships";
+                newData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], newData);
+
+                // get all the top level ID's
+                let urbalurbaIdName = mergeOrganizationsArray[orgCounter].urbalurbaIdName;
+                let organizationNumber = mergeOrganizationsArray[orgCounter].organizationNumber;
+                let sbn_insightly = mergeOrganizationsArray[orgCounter].sbn_insightly;
+                let domain = mergeOrganizationsArray[orgCounter].domain;
+                let web = mergeOrganizationsArray[orgCounter].web;
+                web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
+
+                let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
+                if (createResult == "none") { // there is was an error
+                    console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Error creating");
+                    numError++;
+                } else {
+                    console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Created");
+                    numCreated++;
+                }
+
+
+            } else { // there is an existing org here
+                console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
+
+
+                // split the information about a member into two parts. One "info" part and one "membership" part
+                let existingData = existingMergeRecordArray[0].data; // there should be only one - pick the first one                    
+                const INFO = "info";
+                const MEMBERSHIPS = "memberships";
+                let updatedData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], existingData);
+
+
+                // get all the top level ID's
+                let urbalurbaIdName = "";
+                if (existingMergeRecordArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
+                    urbalurbaIdName = existingMergeRecordArray[0].urbalurbaIdName; //keep the initial 
+                } else {
+                    urbalurbaIdName = mergeOrganizationsArray[orgCounter].urbalurbaIdName; //if not take the one from the new data
+                }
+
+                let organizationNumber = "";
+                if (existingMergeRecordArray[0].organizationNumber) { // we have a organizationNumber
+                    organizationNumber = existingMergeRecordArray[0].organizationNumber; // keep the initial
+                } else { // we take whatever is here
+                    organizationNumber = mergeOrganizationsArray[orgCounter].organizationNumber;
+                }
+
+                let sbn_insightly = "";
+                if (existingMergeRecordArray[0].sbn_insightly) { // we have a insightly ID
+                    sbn_insightly = existingMergeRecordArray[0].sbn_insightly; // keep the initial
+                } else { // we take whatever is here
+                    sbn_insightly = mergeOrganizationsArray[orgCounter].sbn_insightly;
+                }
+
+                let domain = "";
+                if (existingMergeRecordArray[0].domain) { // we have a domain
+                    domain = existingMergeRecordArray[0].domain; // keep the initial
+                } else { // we take whatever is here
+                    domain = mergeOrganizationsArray[orgCounter].domain;
+                }
+
+                let web = "";
+                if (existingMergeRecordArray[0].web) { // we have a domain
+                    web = existingMergeRecordArray[0].web; // keep the initial
+                } else { // we take whatever is here
+                    web = mergeOrganizationsArray[orgCounter].web;
+                }
+                web = addWebProtocol(web);
+
+                let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog);
+                if (updateResult == "none") { // there is was an error
+                    console.error("updateMergeOrganizations: Error cannot update idName=" + idName);
+                    numError++;
+                } else {
+                    console.log("updateMergeOrganizations: Updated idName=" + idName);
+                    numUpdated++;
+                }
+
+            }
+
+        } else {
+            console.log("splitNetwork2organizations: (" + orgCounter + ")No idName:" + idName + " skipping");
+            debugger;
+        }
+
+    }
+
+    return numUpdated + numCreated;
+
+ 
+}
