@@ -1,7 +1,7 @@
 /* functions for 
 - communication with strapi backend
 - converting+++
-22mar21- in the urbalurba-api
+8apr21- in the urbalurba-api
 */
 
 
@@ -126,6 +126,7 @@ async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurb
         idName: idName,
 
         data: newData,
+        exportReady: false,
 
         jobName: config.JOBNAME,
         jobLog: jobLog,
@@ -185,6 +186,62 @@ async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurb
 };
 
 
+
+
+/** updateMergeMasterRecord
+ updates a the masterReord on a merge
+ */
+ export async function updateMergeMasterRecord(config, newMasterRecord, jobStatus, mergeID,  jobLog) {
+
+    let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
+
+    jobLog = addJobLog(config.JOBNAME, jobStatus, jobLog);
+
+
+    let mergeRecord = {
+        masterRecord: newMasterRecord,
+        exportReady: true,
+
+        jobName: config.JOBNAME,
+        jobLog: jobLog,
+        jobStatus: jobStatus
+    };
+
+    let data = "none";
+    let result;
+
+    try {
+
+        result = await axios(
+            {
+                url: strapiRequestURL,
+                method: 'put',
+                headers: {
+                    Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify(mergeRecord)
+            }
+        );
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 updateMergeMasterRecord catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    return data;
+
+};
+
+
+
+
+
+
+
 /** createMerge
  creates a new record in the merge dataset
  */
@@ -200,6 +257,8 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
         entitytype: config.ENTITYTYPE_OUTPUT,
 
         data: newData,
+
+        exportReady: false,
 
         jobName: config.JOBNAME,
         jobLog: jobLog,
@@ -513,7 +572,7 @@ export async function splitNetwork2organizations(config) {
             let members = firstNetwork.data[config.DATA_SECTION_INPUT][jobName];
 
 
-            let numUpdated = await updateMergeOrganizations(config,members); 
+            let numUpdated = await updateMergeOrganizations(config,members, jobName); 
 
             // Finished updating - now we mark it finished
             statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
@@ -952,7 +1011,7 @@ export async function maestro(config) {
     const jobList = [
         {
             number: 1,
-            previousJobName: "members2organization",
+            previousJobName: "networkmembers2organization",
             getJobStatus: "Finished",
             nextJobName: "webpage-info",
             setJobStatus: "Ready",
@@ -1409,10 +1468,10 @@ function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
         "categories",
         "urbalurbaScrapeDate",
         "urbalurbaIdName"
-
+ 
     ];
     const MEMBERSHIPFIELDSARRAY = [
-        "networkIdName",
+       // "networkIdName",
         "networkmemberships",
         "networkMemberTypes",
         "urbalurbaScrapeDate"
@@ -1459,7 +1518,7 @@ function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
 
     }
 
-    // next is to start copying fields into INFO - we do a replac
+    // next is to start copying fields into INFO - we do a replace
     // then we store the known INFO fields and put the not know in urbalurbaImport
     newDataFieldNames = Object.getOwnPropertyNames(newData); //get list of all properties 
     for (let prop = 0; prop < newDataFieldNames.length; prop++) { // loop all properties 
@@ -1689,7 +1748,7 @@ function strapi2mergeRecord(strapiRecord) {
     delete strapiRecord.foreignKeys; // after moving we delete it
 
     strapiRecord.urbalurbaScrapeDate = new Date().toISOString();
-    strapiRecord.networkIdName = config.IDNAME; // belongsto the network that imports
+    // CHANGED to networkmemberships - strapiRecord.networkIdName = config.IDNAME; // belongsto the network that imports
 
 
 
@@ -1742,11 +1801,12 @@ function strapi2mergeRecord(strapiRecord) {
  a organization record must be formatted as a mergeRecord
  returns the number of organizations created/updated
  */
- export async function updateMergeOrganizations(config,mergeOrganizationsArray) {
+ export async function updateMergeOrganizations(config,mergeOrganizationsArray, jobName) {
 
     let numUpdated =0;
     let numCreated = 0;
     let numError = 0;
+
 
     for (let orgCounter = 0; orgCounter < mergeOrganizationsArray.length; orgCounter++) {
         let idName = mergeOrganizationsArray[orgCounter].domain;

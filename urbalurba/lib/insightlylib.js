@@ -2467,7 +2467,7 @@ function insightlyGetTags(orgRecord) {
 /** convertCategoryitems2Keys
 * Takes the categry holding the categoryitems that is saved on the entry
 * and finds its keys by removing blanks etc.
-* The keys can after this be used to look up in the deinition of all categories 
+* The keys can after this be used to look up in the definition of all categories 
 * @param {*} category 
 */
 function convertCategoryitems2Keys(category) { //eg for industry
@@ -3691,5 +3691,249 @@ export function insightly2mergeRecord(insightlyRecord) {
 
 
     return mergeRecord;
+
+}
+
+
+/** insightlyArray2mergeArray
+ takes an insightly array and returns a merge array
+ */
+export function insightlyArray2mergeArray(insightlyArray) {
+
+    let mergeArray = [];
+
+
+
+    for (let i = 0; i < insightlyArray.length; i++) {
+
+        let insightlyRecord = insightlyArray[i];
+
+        let mergeRecord = insightly2mergeRecord(insightlyRecord);
+        mergeArray.push(mergeRecord);
+
+    }
+
+    return mergeArray;
+
+}
+
+/** merge2insightlyRecord
+ takes a merge Record (mergeRecord) and transforms it's fields to a insightly Record
+ !! be aware that when updating insightly a full record must be written - fields that are not there is lost
+ To prevent loss of data the function thakes a template insighty record (existingInsightlyRecord) - so read the record first then use this function
+
+A insightly record looks like this
+https://api.insightly.com/v3.1/Organisations/98965342
+
+
+ */
+export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
+
+
+    
+    let updatedInsightlyRecord = {};
+
+    updatedInsightlyRecord = existingInsightlyRecord; // copy whatever is in the insightly record
+
+    if (mergeRecord.organization.sbn_insightly && (mergeRecord.organization.sbn_insightly == existingInsightlyRecord.ORGANISATION_ID)) { // if it exists in insightly 
+
+        updatedInsightlyRecord.ORGANISATION_NAME = mergeRecord.organization.displayName;
+        updatedInsightlyRecord.BACKGROUND = mergeRecord.organization.description;
+        updatedInsightlyRecord.PHONE = mergeRecord.organization.phone;
+        updatedInsightlyRecord.WEBSITE = mergeRecord.organization.web;
+
+        updatedInsightlyRecord.ADDRESS_SHIP_STREET = mergeRecord.organization.location.visitingAddress.street;
+        updatedInsightlyRecord.ADDRESS_SHIP_CITY = mergeRecord.organization.location.visitingAddress.city;
+        updatedInsightlyRecord.ADDRESS_SHIP_STATE = mergeRecord.organization.location.adminLocation.countyName;
+        updatedInsightlyRecord.ADDRESS_SHIP_POSTCODE = mergeRecord.organization.location.visitingAddress.postcode;
+        updatedInsightlyRecord.ADDRESS_SHIP_COUNTRY = mergeRecord.organization.location.visitingAddress.country;
+
+
+        updatedInsightlyRecord.EMAIL_DOMAIN = mergeRecord.organization.domain;
+
+
+
+        //CUSTOMFIELDS
+        let setCustomFieldResult;
+
+        //organization_type is ???? 
+        //TODO: setCustomFieldResult = setInsightlyCustomField("organization_type", mergeRecord.organizationNumber, updatedInsightlyRecord);    
+
+
+
+        //the social fields
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_LINKEDIN", mergeRecord.organization.socialLinks.linkedin, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_FACEBOOK", mergeRecord.organization.socialLinks.facebook, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_TWITTER", mergeRecord.organization.socialLinks.twitter, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_INSTRAGRAM", mergeRecord.organization.socialLinks.instagram, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_YOUTUBE", mergeRecord.organization.socialLinks.youtube, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SOCIAL_OTHER", mergeRecord.organization.socialLinks.otherURL, updatedInsightlyRecord);
+
+
+        //slogan
+        setCustomFieldResult = setInsightlyCustomField("slogan", mergeRecord.organization.slogan, updatedInsightlyRecord);
+
+        // summary 
+        setCustomFieldResult = setInsightlyCustomField("summary", mergeRecord.organization.summary, updatedInsightlyRecord);
+
+        //email
+        setCustomFieldResult = setInsightlyCustomField("ORGANIZATION_EMAIL", mergeRecord.organization.email, updatedInsightlyRecord);
+
+        //CKAN_NAME is the idName
+        setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", mergeRecord.organization.idName, updatedInsightlyRecord);
+
+        //fylke is  countyName
+        setCustomFieldResult = setInsightlyCustomField("fylke", mergeRecord.organization.location.adminLocation.countyName, updatedInsightlyRecord);
+
+        //kommunenr is  countyName
+        setCustomFieldResult = setInsightlyCustomField("kommunenr", mergeRecord.organization.location.adminLocation.municipalityId, updatedInsightlyRecord);
+
+        //Organisasjonsnummer is organizationNumber 
+        setCustomFieldResult = setInsightlyCustomField("kommunenr", mergeRecord.organization.organizationNumber, updatedInsightlyRecord);
+
+
+        //TODO: change brreg fields
+        setCustomFieldResult = setInsightlyCustomField("BRREG_EMPLOYEES", mergeRecord.organization.brreg.employees, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("BRREG_ORGTYPE", mergeRecord.organization.brreg.orgType, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", mergeRecord.organization.brreg.foundedDate, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("BRREG_DELETE_DATE", mergeRecord.organization.brreg.endDate, updatedInsightlyRecord);
+
+
+        // images
+        setCustomFieldResult = setInsightlyCustomField("CKAN_LOGO_IMAGE", mergeRecord.organization.image.profile, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("COVER_IMAGE", mergeRecord.organization.image.cover, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("ICON_IMAGE", mergeRecord.organization.image.icon, updatedInsightlyRecord);
+        setCustomFieldResult = setInsightlyCustomField("SQUARE_IMAGE", mergeRecord.organization.image.square, updatedInsightlyRecord);
+
+
+        // fields that are in the categories 
+        let sector = categoryArray2string(mergeRecord.organization.categories.sector, ";");
+        setCustomFieldResult = setInsightlyCustomField("organization_type", sector, updatedInsightlyRecord);
+
+        let member_tags = categoryArray2string(mergeRecord.organization.categories.tag, ",");
+        setCustomFieldResult = setInsightlyCustomField("member_tags", member_tags, updatedInsightlyRecord);
+
+        let organization_segments = categoryArray2string(mergeRecord.organization.categories.industry, ";");
+        setCustomFieldResult = setInsightlyCustomField("organization_segments", organization_segments, updatedInsightlyRecord);
+
+        let Sustainable_Development_Goals = categoryArray2string(mergeRecord.organization.categories.sdg, ",");
+        setCustomFieldResult = setInsightlyCustomField("Sustainable_Development_Goals", Sustainable_Development_Goals, updatedInsightlyRecord);
+
+        let problems_solved = categoryArray2string(mergeRecord.organization.categories.challenge, ";");
+        setCustomFieldResult = setInsightlyCustomField("problems_solved", problems_solved, updatedInsightlyRecord);
+
+
+        //EMAILDOMAINS
+        updatedInsightlyRecord.EMAILDOMAINS = mergeDomains2insightly(mergeRecord.organization.domains, updatedInsightlyRecord.EMAILDOMAINS);
+
+
+
+        //TAGS is the way we define what network the org is member of
+        updatedInsightlyRecord.TAGS = mergeNetworkmemberships2insightly(mergeRecord.networkmemberships, updatedInsightlyRecord.TAGS);
+
+
+    } else {  // trouble
+        updatedInsightlyRecord = "none";
+
+    }
+
+    return updatedInsightlyRecord;
+
+
+}
+
+
+
+/** category2string
+ takes a category array and put all of its items in a string separeted by delimiter
+ if category is empty or not an array then "" is returned
+ if there are no delimiter then it is set to ";"
+ */
+function categoryArray2string(category, delimiter) {
+
+    let returnString = "";
+    if (!delimiter) delimiter = ";"; // use ; if nothing defined
+
+    if (Array.isArray(category)) { // and it is an array
+        for (let i = 0; i < category.length; i++) {
+            if (returnString != "") {
+                returnString = returnString + delimiter; // put delimiter, but not the first time 
+            }
+            returnString = returnString + category[i]; //concatinate
+        }
+    }
+    return returnString;
+}
+
+/** mergeDomains2insightly
+ takes the marge domains and the existing insightly domains
+ in Insightly the domains have ID' so that we need to check if a domain exists before we add it
+
+ the structure of domains in insighty
+    "EMAILDOMAINS": [
+        {
+            "EMAIL_DOMAIN_ID": 10396971,
+            "EMAIL_DOMAIN": "abax.com"
+        },
+        {
+            "EMAIL_DOMAIN_ID": 2212018,
+            "EMAIL_DOMAIN": "abax.no"
+        }
+    ]
+ */
+function mergeDomains2insightly(mergeDomains, exisistingInsightyDomains) {
+
+    let returnInsightlyDomains = [];
+    let foundIndex;
+
+    if (Array.isArray(mergeDomains)) { // and it is an array
+
+        for (let i = 0; i < mergeDomains.length; i++) {
+            foundIndex = 0;
+            foundIndex = exisistingInsightyDomains.findIndex(domain => domain.EMAIL_DOMAIN == mergeDomains[i]);
+            if (foundIndex >= 0) { // its there
+                returnInsightlyDomains.push(exisistingInsightyDomains[foundIndex]); // its already there - keep it
+            } else {
+                let domainRecord = {
+                    "EMAIL_DOMAIN": tagName
+                }
+                returnInsightlyDomains.push(domainRecord)
+            }
+        }
+
+    }
+
+    return returnInsightlyDomains;
+
+}
+
+/** mergeNetworkmemberships2insightly
+ takes the merge networkmemberships and the tags in insightly.
+in Insightly we use a tags to indicate what network the organization is member of.
+every tag that has a # as first char is a network. 
+eg #smartebyernorge.no means that the organization is mamber of the network smartebyernorge.no
+
+the tags are usedfor other stuff also. So we must NOT mess with tags that has no #
+
+ */
+function mergeNetworkmemberships2insightly(networkmemberships, exisistingInsightyTags) {
+
+
+    let returnInsightlyTags = [];
+
+    //first copy all tags that is not a network. 
+    for (let i = 0; i < exisistingInsightyTags.length; i++) {
+        if (INSIGHTLY_NETWORKTAGCHAR != exisistingInsightyTags[i].TAG_NAME.slice(0, 1)) {
+            returnInsightlyTags.push(exisistingInsightyTags[i])
+        }
+    }
+
+    // then add the networkmemberships as tags
+    for (let i = 0; i < networkmemberships.length; i++) {
+        let tagRecord = {
+            "TAG_NAME": INSIGHTLY_NETWORKTAGCHAR + networkmemberships[i]
+        }
+        returnInsightlyTags.push(tagRecord)
+    }
 
 }
