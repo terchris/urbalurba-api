@@ -115,18 +115,21 @@ async function getMergesByEntitytypeANDstatus(config, entitytype, jobStatus) {
 /** updateMerge
  updates a record in the merge dataset
  */
-async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog) {
+export async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog, dataSource, exportReady ) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
-    jobLog = addJobLog(config.JOBNAME, jobStatus, jobLog);
+    jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
+    if (!exportReady) { //this so that we can update whitehout setting exportReady to false. It is used when writing data bask after updated Insightly
+        exportReady=false;
+    }
 
     let mergeRecord = {
         idName: idName,
 
         data: newData,
-        exportReady: false,
+        exportReady: exportReady,
 
         jobName: config.JOBNAME,
         jobLog: jobLog,
@@ -195,7 +198,7 @@ async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurb
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
-    jobLog = addJobLog(config.JOBNAME, jobStatus, jobLog);
+    jobLog = addJobLog(config.JOBNAME, config.DATASOURCE, jobStatus, jobLog);
 
 
     let mergeRecord = {
@@ -245,12 +248,12 @@ async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurb
 /** createMerge
  creates a new record in the merge dataset
  */
-async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web) {
+async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET;
 
     let jobLog = null; // jobLog does not exist the first time
-    jobLog = addJobLog(config.JOBNAME, jobStatus, jobLog);
+    jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
     let mergeRecord = {
         idName: idName,
@@ -327,7 +330,7 @@ The attribute looks like this:
     }
 } 
  */
-function addJobLog(jobName, jobStatus, jobLogField) {
+function addJobLog(jobName,dataSource, jobStatus, jobLogField) {
 
     if (!jobLogField) { // first time
         jobLogField = {
@@ -339,6 +342,7 @@ function addJobLog(jobName, jobStatus, jobLogField) {
     jobLogField[jobLogField.jobNumber] = {
         date: new Date().toISOString(),
         jobName: jobName,
+        dataSource: dataSource,
         jobStatus: jobStatus
     }
 
@@ -355,7 +359,7 @@ export async function setJobStatus(config, mergeID, jobName, jobStatus, jobLog) 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
 
-    jobLog = addJobLog(jobName, jobStatus, jobLog);
+    jobLog = addJobLog(jobName, config.DATASOURCE, jobStatus, jobLog);
 
 
     //config values
@@ -417,7 +421,8 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
     if (!jobStatus) jobStatus = config.JOBSTATUS_OUTPUT;
 
-    let jobName = config.JOBNAME; //any reason for a parameter?
+    
+    let dataSource = config.DATASOURCE; 
 
 
     let organizationNumber = null;
@@ -433,14 +438,14 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
         let newData = {};
         newData[config.DATA_SECTION_OUTPUT] = {};
-        newData[config.DATA_SECTION_OUTPUT][jobName] = data;
+        newData[config.DATA_SECTION_OUTPUT][dataSource] = data;
         urbalurbaIdName = data.urbalurbaIdName; //assume there is
         organizationNumber = data.organizationNumber; //assume there is        
         sbn_insightly = data.sbn_insightly; //assume there is
         domain = data.domain; //assume there is
         web = data.web; //assume there is
 
-        let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
+        let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
 
 
         if (mergeRecord == "none") { // there is was an error
@@ -460,7 +465,7 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
             existingData[config.DATA_SECTION_OUTPUT] = {};
         }
 
-        existingData[config.DATA_SECTION_OUTPUT][jobName] = data; //update info from the source    
+        existingData[config.DATA_SECTION_OUTPUT][dataSource] = data; //update info from the source    
 
         // get all the top level ID's
 
@@ -503,7 +508,7 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
 
 
-        let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog);
+        let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, dataSource);
 
         if (updateMergeRecordResult == "none") { // there is was an error
             console.error("pushData: Error updating scraping for:" + idName);
@@ -564,15 +569,15 @@ export async function splitNetwork2organizations(config) {
         //inside the data property there should be just one property.And that property should have the jobName of the job that created it
         // since that can be lots of jobName's we must list them to find its name. Then pick that name
         let dataProperties = Object.getOwnPropertyNames(firstNetwork.data[config.DATA_SECTION_INPUT]); //get list of all property names
-        let jobName = "";
+        let dataSource = "";
         if (dataProperties.length > 0) {
-            jobName = dataProperties[0]; // get the name of the job that created the property that contains the members
+            dataSource = dataProperties[0]; // get the name of the job that created the property that contains the members
 
             // loop all members in the list and create one mergeRecord for each member
-            let members = firstNetwork.data[config.DATA_SECTION_INPUT][jobName];
+            let members = firstNetwork.data[config.DATA_SECTION_INPUT][dataSource];
 
 
-            let numUpdated = await updateMergeOrganizations(config,members, jobName); 
+            let numUpdated = await updateMergeOrganizations(config,members, dataSource); 
 
             // Finished updating - now we mark it finished
             statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
@@ -1010,17 +1015,26 @@ export async function maestro(config) {
 
     const jobList = [
         {
+            number: 0,
+            previousJobName: "insightly_organizations2merge",
+            getJobStatus: "Ready",
+            nextJobName: "webpage_info",
+            setJobStatus: "Ready",
+            nextJobStartUrl: "https://jalla.com"
+
+        },        
+        {
             number: 1,
-            previousJobName: "networkmembers2organization",
+            previousJobName: "split_network2organizations",
             getJobStatus: "Finished",
-            nextJobName: "webpage-info",
+            nextJobName: "webpage_info",
             setJobStatus: "Ready",
             nextJobStartUrl: "https://jalla.com"
 
         },
         {
-            number: 2,
-            previousJobName: "webpage-info",
+            number: 2, //dont change the number
+            previousJobName: "webpage_info",
             getJobStatus: "Finished",
             nextJobName: "brreg-orgnum,brreg-web",
             setJobStatus: "Ready",
@@ -1429,11 +1443,11 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
 }
 /** member2mergeRecord
  the data or one member (memberData) needs to be split into two parts
- The data that is info goes into info: {} and the data that describes the membership goes into memberships:
+ The data that is info goes into source: {} and the data that describes the membership goes into memberships:
  Returns a data record that can be written to the database.
  The full memberData is copied to the field urbalurbaImport 
  */
-function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
+export function member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, newData, existingData) {
 
     let returnData = {};
     let infoData = {};
@@ -1473,7 +1487,7 @@ function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
     const MEMBERSHIPFIELDSARRAY = [
        // "networkIdName",
         "networkmemberships",
-        "networkMemberTypes",
+        //"networkMemberTypes",
         "urbalurbaScrapeDate"
 
     ];
@@ -1490,9 +1504,9 @@ function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
 
 
     // check if there nessesery fields are there. If not we create them
-    tmpResult = getNested(returnData, INFO); // check the INFO
+    tmpResult = getNested(returnData, SOURCE); // check the INFO
     if (!tmpResult) { // its data in the INFO
-        returnData[INFO] = {}; // create the INFO
+        returnData[SOURCE] = {}; // create the INFO
     }
 
     tmpResult = getNested(returnData, MEMBERSHIPS); // check the MEMBERSHIPS
@@ -1558,11 +1572,11 @@ function member2mergeRecord(jobName, INFO, MEMBERSHIPS, newData, existingData) {
 
 
     // put the info data in place
-    returnData[INFO][jobName] = infoData;
+    returnData[SOURCE][dataSource] = infoData;
     // put the fields that is not known in the urbalurbaImport
-    returnData[INFO][jobName].urbalurbaImport = urbalurbaImportData;
+    returnData[SOURCE][dataSource].urbalurbaImport = urbalurbaImportData;
     // put the membership in place
-    returnData[MEMBERSHIPS][jobName] = membershipsData;
+    returnData[MEMBERSHIPS][dataSource] = membershipsData;
 
 
 
@@ -1617,7 +1631,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             let newData = {};
 
             // split the information about a network into two parts. One "info" part and one "membership" part
-            const INFO = "info";
+            const INFO = "source";
             const MEMBERSHIPS = "categories";
             newData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, currentMergeNetworkRecord, newData);
 
@@ -1648,7 +1662,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
             // split the information about a network into two parts. One "info" part and one "membership" part
             let existingData = mergeArray[0].data; // there should be only one - pick the first one                    
-            const INFO = "info";
+            const INFO = "source";
             const MEMBERSHIPS = "categories";
             let updatedData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, currentMergeNetworkRecord, existingData);
 
@@ -1801,25 +1815,25 @@ function strapi2mergeRecord(strapiRecord) {
  a organization record must be formatted as a mergeRecord
  returns the number of organizations created/updated
  */
- export async function updateMergeOrganizations(config,mergeOrganizationsArray, jobName) {
+ export async function updateMergeOrganizations(config,mergeOrganizationsArray, dataSource) {
 
     let numUpdated =0;
     let numCreated = 0;
     let numError = 0;
 
+    const SOURCE = "source";
+    const MEMBERSHIPS = "memberships";
 
     for (let orgCounter = 0; orgCounter < mergeOrganizationsArray.length; orgCounter++) {
-        let idName = mergeOrganizationsArray[orgCounter].domain;
+        let idName = mergeOrganizationsArray[orgCounter].idName;
         if (idName) {
             let existingMergeRecordArray = await getMergesByIdNameANDentitytype(config, idName, config.ENTITYTYPE_OUTPUT);
             if (existingMergeRecordArray.length == 0) { // there is no previous record      
 
                 let newData = {};
 
-                // split the information about a member into two parts. One "info" part and one "membership" part
-                const INFO = "info";
-                const MEMBERSHIPS = "memberships";
-                newData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], newData);
+                // split the information about a member into two parts. One "source" part and one "membership" part
+                newData = member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], newData);
 
                 // get all the top level ID's
                 let urbalurbaIdName = mergeOrganizationsArray[orgCounter].urbalurbaIdName;
@@ -1829,7 +1843,7 @@ function strapi2mergeRecord(strapiRecord) {
                 let web = mergeOrganizationsArray[orgCounter].web;
                 web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
 
-                let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web);
+                let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
                 if (createResult == "none") { // there is was an error
                     console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Error creating");
                     numError++;
@@ -1843,11 +1857,10 @@ function strapi2mergeRecord(strapiRecord) {
                 console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
 
 
-                // split the information about a member into two parts. One "info" part and one "membership" part
+                // split the information about a member into two parts. One "source" part and one "membership" part
                 let existingData = existingMergeRecordArray[0].data; // there should be only one - pick the first one                    
-                const INFO = "info";
-                const MEMBERSHIPS = "memberships";
-                let updatedData = member2mergeRecord(jobName, INFO, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], existingData);
+
+                let updatedData = member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], existingData);
 
 
                 // get all the top level ID's
@@ -1887,7 +1900,7 @@ function strapi2mergeRecord(strapiRecord) {
                 }
                 web = addWebProtocol(web);
 
-                let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog);
+                let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog, dataSource);
                 if (updateResult == "none") { // there is was an error
                     console.error("updateMergeOrganizations: Error cannot update idName=" + idName);
                     numError++;

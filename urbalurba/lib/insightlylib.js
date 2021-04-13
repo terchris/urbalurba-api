@@ -22,7 +22,7 @@ import {
 
 
 import {
-    replaceItemInArray, filterArray, name2UrbalurbaIdName, string2IdKey
+    replaceItemInArray, filterArray, name2UrbalurbaIdName, string2IdKey, getNested
 } from "./urbalurbalib2.js";
 
 
@@ -3730,113 +3730,283 @@ https://api.insightly.com/v3.1/Organisations/98965342
 export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
 
-    
+
     let updatedInsightlyRecord = {};
+    let tmpResult = "";
 
     updatedInsightlyRecord = existingInsightlyRecord; // copy whatever is in the insightly record
 
-    if (mergeRecord.organization.sbn_insightly && (mergeRecord.organization.sbn_insightly == existingInsightlyRecord.ORGANISATION_ID)) { // if it exists in insightly 
 
-        updatedInsightlyRecord.ORGANISATION_NAME = mergeRecord.organization.displayName;
-        updatedInsightlyRecord.BACKGROUND = mergeRecord.organization.description;
-        updatedInsightlyRecord.PHONE = mergeRecord.organization.phone;
-        updatedInsightlyRecord.WEBSITE = mergeRecord.organization.web;
+    // if there a mergeRecord.organization.sbn_insightly - it should be if the data is structured correct
+    tmpResult = getNested(mergeRecord, "organization", "sbn_insightly");
+    if (tmpResult) { // its there
 
-        updatedInsightlyRecord.ADDRESS_SHIP_STREET = mergeRecord.organization.location.visitingAddress.street;
-        updatedInsightlyRecord.ADDRESS_SHIP_CITY = mergeRecord.organization.location.visitingAddress.city;
-        updatedInsightlyRecord.ADDRESS_SHIP_STATE = mergeRecord.organization.location.adminLocation.countyName;
-        updatedInsightlyRecord.ADDRESS_SHIP_POSTCODE = mergeRecord.organization.location.visitingAddress.postcode;
-        updatedInsightlyRecord.ADDRESS_SHIP_COUNTRY = mergeRecord.organization.location.visitingAddress.country;
+        if (mergeRecord.organization.sbn_insightly && (mergeRecord.organization.sbn_insightly == existingInsightlyRecord.ORGANISATION_ID)) { // if it exists in insightly 
 
-
-        updatedInsightlyRecord.EMAIL_DOMAIN = mergeRecord.organization.domain;
+            //organization_type is ???? 
+            //TODO: setCustomFieldResult = setInsightlyCustomField("organization_type", mergeRecord.organizationNumber, updatedInsightlyRecord);    
 
 
 
-        //CUSTOMFIELDS
-        let setCustomFieldResult;
-
-        //organization_type is ???? 
-        //TODO: setCustomFieldResult = setInsightlyCustomField("organization_type", mergeRecord.organizationNumber, updatedInsightlyRecord);    
 
 
+            tmpResult = getNested(mergeRecord, "organization", "displayName");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ORGANISATION_NAME = tmpResult;
+            }
 
-        //the social fields
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_LINKEDIN", mergeRecord.organization.socialLinks.linkedin, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_FACEBOOK", mergeRecord.organization.socialLinks.facebook, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_TWITTER", mergeRecord.organization.socialLinks.twitter, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_INSTRAGRAM", mergeRecord.organization.socialLinks.instagram, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_YOUTUBE", mergeRecord.organization.socialLinks.youtube, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SOCIAL_OTHER", mergeRecord.organization.socialLinks.otherURL, updatedInsightlyRecord);
+            tmpResult = getNested(mergeRecord, "organization", "description");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.BACKGROUND = tmpResult;
+            }
 
+            tmpResult = getNested(mergeRecord, "organization", "phone");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.PHONE = tmpResult;
+            }
 
-        //slogan
-        setCustomFieldResult = setInsightlyCustomField("slogan", mergeRecord.organization.slogan, updatedInsightlyRecord);
+            tmpResult = getNested(mergeRecord, "organization", "web");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.WEBSITE = tmpResult;
+            }
 
-        // summary 
-        setCustomFieldResult = setInsightlyCustomField("summary", mergeRecord.organization.summary, updatedInsightlyRecord);
-
-        //email
-        setCustomFieldResult = setInsightlyCustomField("ORGANIZATION_EMAIL", mergeRecord.organization.email, updatedInsightlyRecord);
-
-        //CKAN_NAME is the idName
-        setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", mergeRecord.organization.idName, updatedInsightlyRecord);
-
-        //fylke is  countyName
-        setCustomFieldResult = setInsightlyCustomField("fylke", mergeRecord.organization.location.adminLocation.countyName, updatedInsightlyRecord);
-
-        //kommunenr is  countyName
-        setCustomFieldResult = setInsightlyCustomField("kommunenr", mergeRecord.organization.location.adminLocation.municipalityId, updatedInsightlyRecord);
-
-        //Organisasjonsnummer is organizationNumber 
-        setCustomFieldResult = setInsightlyCustomField("kommunenr", mergeRecord.organization.organizationNumber, updatedInsightlyRecord);
-
-
-        //TODO: change brreg fields
-        setCustomFieldResult = setInsightlyCustomField("BRREG_EMPLOYEES", mergeRecord.organization.brreg.employees, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("BRREG_ORGTYPE", mergeRecord.organization.brreg.orgType, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", mergeRecord.organization.brreg.foundedDate, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("BRREG_DELETE_DATE", mergeRecord.organization.brreg.endDate, updatedInsightlyRecord);
-
-
-        // images
-        setCustomFieldResult = setInsightlyCustomField("CKAN_LOGO_IMAGE", mergeRecord.organization.image.profile, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("COVER_IMAGE", mergeRecord.organization.image.cover, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("ICON_IMAGE", mergeRecord.organization.image.icon, updatedInsightlyRecord);
-        setCustomFieldResult = setInsightlyCustomField("SQUARE_IMAGE", mergeRecord.organization.image.square, updatedInsightlyRecord);
+            tmpResult = getNested(mergeRecord, "organization", "domain");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.EMAIL_DOMAIN = tmpResult;
+            }
+                  
+            //the social fields
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "linkedin");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.SOCIAL_LINKEDIN = tmpResult;
+            }
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "facebook");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.SOCIAL_FACEBOOK = tmpResult;
+            }
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "twitter");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.SOCIAL_TWITTER = tmpResult;
+            }
 
 
-        // fields that are in the categories 
-        let sector = categoryArray2string(mergeRecord.organization.categories.sector, ";");
-        setCustomFieldResult = setInsightlyCustomField("organization_type", sector, updatedInsightlyRecord);
-
-        let member_tags = categoryArray2string(mergeRecord.organization.categories.tag, ",");
-        setCustomFieldResult = setInsightlyCustomField("member_tags", member_tags, updatedInsightlyRecord);
-
-        let organization_segments = categoryArray2string(mergeRecord.organization.categories.industry, ";");
-        setCustomFieldResult = setInsightlyCustomField("organization_segments", organization_segments, updatedInsightlyRecord);
-
-        let Sustainable_Development_Goals = categoryArray2string(mergeRecord.organization.categories.sdg, ",");
-        setCustomFieldResult = setInsightlyCustomField("Sustainable_Development_Goals", Sustainable_Development_Goals, updatedInsightlyRecord);
-
-        let problems_solved = categoryArray2string(mergeRecord.organization.categories.challenge, ";");
-        setCustomFieldResult = setInsightlyCustomField("problems_solved", problems_solved, updatedInsightlyRecord);
-
-
-        //EMAILDOMAINS
-        updatedInsightlyRecord.EMAILDOMAINS = mergeDomains2insightly(mergeRecord.organization.domains, updatedInsightlyRecord.EMAILDOMAINS);
+        // the location fields            
+            tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "street");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ADDRESS_SHIP_STREET = tmpResult;
+            }
+            tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "city");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ADDRESS_SHIP_CITY = tmpResult;
+            }
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ADDRESS_SHIP_STATE = tmpResult;
+            }
+            tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "postcode");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ADDRESS_SHIP_POSTCODE = tmpResult;
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "country");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.ADDRESS_SHIP_COUNTRY = tmpResult;
+            }
 
 
 
-        //TAGS is the way we define what network the org is member of
-        updatedInsightlyRecord.TAGS = mergeNetworkmemberships2insightly(mergeRecord.networkmemberships, updatedInsightlyRecord.TAGS);
+            //CUSTOMFIELDS
+            let setCustomFieldResult;
+
+            //the adminLocation fields
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_FYLKENAVN", tmpResult, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyId");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_FYLKENUMMER", tmpResult, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityName");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_KOMMUNENAVN", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_KOMMUNENUMMER", tmpResult, updatedInsightlyRecord);
+            }
+
+            // the GPS fields
+            tmpResult = getNested(mergeRecord, "organization", "location", "latLng", "lat");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_LATITUDE", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "location", "latLng", "lng");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("LOCATION_LONGITUDE", tmpResult, updatedInsightlyRecord);
+            }
 
 
-    } else {  // trouble
+
+            //the custom social fields
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "instagram");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("SOCIAL_INSTRAGRAM", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "youtube");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("SOCIAL_YOUTUBE", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "socialLinks", "otherURL");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("SOCIAL_OTHER", tmpResult, updatedInsightlyRecord);
+            }
+            
+            //slogan            
+            tmpResult = getNested(mergeRecord, "organization", "slogan");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("slogan", tmpResult, updatedInsightlyRecord);
+            }
+
+            // summary 
+            tmpResult = getNested(mergeRecord, "organization", "summary");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("summary", tmpResult, updatedInsightlyRecord);
+            }
+
+            //email
+            tmpResult = getNested(mergeRecord, "organization", "email");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ORGANIZATION_EMAIL", tmpResult, updatedInsightlyRecord);
+            }
+            
+            //CKAN_NAME is the idName
+            tmpResult = getNested(mergeRecord, "organization", "idName");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", tmpResult, updatedInsightlyRecord);
+            }
+
+            //fylke is  countyName
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("fylke", tmpResult, updatedInsightlyRecord);
+            }            
+
+            //kommunenr is  countyName
+            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("kommunenr", tmpResult, updatedInsightlyRecord);
+            }            
+            
+            //Organisasjonsnummer is organizationNumber 
+            tmpResult = getNested(mergeRecord, "organization", "organizationNumber");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("Organisasjonsnummer", tmpResult, updatedInsightlyRecord);
+            }            
+                        
+
+
+
+            //TODO: change brreg fields
+            tmpResult = getNested(mergeRecord, "organization", "brreg", "employees");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("BRREG_EMPLOYEES", tmpResult, updatedInsightlyRecord);
+            }            
+                         
+            tmpResult = getNested(mergeRecord, "organization", "brreg", "orgType");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("BRREG_ORGTYPE", tmpResult, updatedInsightlyRecord);
+            }            
+            
+            tmpResult = getNested(mergeRecord, "organization", "brreg", "foundedDate");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", tmpResult, updatedInsightlyRecord);
+            }            
+            
+            tmpResult = getNested(mergeRecord, "organization", "brreg", "endDate");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("BRREG_DELETE_DATE", tmpResult, updatedInsightlyRecord);
+            }            
+                        
+            
+
+            // images
+            tmpResult = getNested(mergeRecord, "organization", "image", "profile");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("CKAN_LOGO_IMAGE", tmpResult, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "image", "cover");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("COVER_IMAGE", tmpResult, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "image", "icon");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ICON_IMAGE", tmpResult, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "image", "square");
+            if (tmpResult) { // its there
+                setCustomFieldResult = setInsightlyCustomField("SQUARE_IMAGE", tmpResult, updatedInsightlyRecord);
+            }            
+            
+            
+            
+
+
+            // fields that are in the categories 
+            tmpResult = getNested(mergeRecord, "organization", "categories", "sector");
+            if (tmpResult) { // its there
+                let sector = categoryArray2string(tmpResult, ";");
+                setCustomFieldResult = setInsightlyCustomField("organization_type", sector, updatedInsightlyRecord);
+            }            
+            tmpResult = getNested(mergeRecord, "organization", "categories", "tag");
+            if (tmpResult) { // its there
+                let member_tags = categoryArray2string(tmpResult, ";");
+                setCustomFieldResult = setInsightlyCustomField("member_tags", member_tags, updatedInsightlyRecord);
+            }            
+         
+            tmpResult = getNested(mergeRecord, "organization", "categories", "sdg");
+            if (tmpResult) { // its there
+                let Sustainable_Development_Goals = categoryArray2string(tmpResult, ",");
+                setCustomFieldResult = setInsightlyCustomField("Sustainable_Development_Goals", Sustainable_Development_Goals, updatedInsightlyRecord);
+            }      
+            
+
+            tmpResult = getNested(mergeRecord, "organization", "categories", "industry");
+            if (tmpResult) { // its there
+                let organization_segments = categoryArray2string(tmpResult, ";");
+                setCustomFieldResult = setInsightlyCustomField("organization_segments", organization_segments, updatedInsightlyRecord);
+            }   
+            tmpResult = getNested(mergeRecord, "organization", "categories", "challenge");
+            if (tmpResult) { // its there
+                let problems_solved = categoryArray2string(tmpResult, ";");
+                setCustomFieldResult = setInsightlyCustomField("problems_solved", problems_solved, updatedInsightlyRecord);
+            }            
+            
+
+
+            //EMAILDOMAINS
+            tmpResult = getNested(mergeRecord, "organization", "domains");
+            if (tmpResult) { // its there
+                updatedInsightlyRecord.EMAILDOMAINS = mergeDomains2insightly(tmpResult, updatedInsightlyRecord.EMAILDOMAINS);                    
+            }            
+
+            
+
+            //TAGS is the way we define what network the org is member of
+            tmpResult = getNested(mergeRecord, "networkmemberships");
+            if (tmpResult) { // its there                
+                updatedInsightlyRecord.TAGS = mergeNetworkmemberships2insightly(tmpResult, updatedInsightlyRecord.TAGS);
+            }            
+
+
+
+
+        } else {  // trouble
+            updatedInsightlyRecord = "none";
+
+        }
+    } else { // trouble- mergeRecord is not formattet correctly
         updatedInsightlyRecord = "none";
-
     }
-
     return updatedInsightlyRecord;
 
 
@@ -3935,5 +4105,7 @@ function mergeNetworkmemberships2insightly(networkmemberships, exisistingInsight
         }
         returnInsightlyTags.push(tagRecord)
     }
+
+    return returnInsightlyTags;
 
 }
