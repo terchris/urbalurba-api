@@ -127,6 +127,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
 
     let newMasterRecord = generateNewMasterRecord(newData);
+    if(newMasterRecord == "none") newMasterRecord= null;
 
     let mergeRecord = {
         idName: idName,
@@ -260,6 +261,7 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
     let newMasterRecord = generateNewMasterRecord(newData);
+    if(newMasterRecord == "none") newMasterRecord= null;
 
     let mergeRecord = {
         idName: idName,
@@ -2165,99 +2167,113 @@ function removeDuplicatesInArray(data) {
 /** generateNewMasterRecord
 takes the .data part (currentData) of a merge record and returns a masterRecord (that is a merge of the data)
 all fields defined in masterRecordStructure is included in the returned in te new masterRecord
+
+returns "none" if the record is not converted;
  */
 export function generateNewMasterRecord(currentData) {
 
+    let newMasterRecord = {}; // "none" if smething is not 
     let masterRecordStructure = MERGECONFIG.masterRecord;
     let mergePriorityArray = MERGECONFIG.mergepriority;
 
     let newOrganizationMasterRecord = {}; // where we store the default data we find on a organization
     let newNetworkmemberships = []; // where we store the networks the organization is member of
 
-    //let mergeRecordFieldNameArray = Object.getOwnPropertyNames(config.MERGERECORD); //get list of all properties i the MERGERECORD
-    let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
-
-    for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
-        let fieldName = mergeRecordFieldNameArray[MergeRecordFieldNum];
-
-        // now we have he field name, but we dont know if it has further properties.
-        // a property can be A) Field (num og string) B) an array C) an object containing objects/arrays D) categories
-        // we must use the fields on the jobs2processArray[readyJob].organizationNumber sbn_insighty and so on - and NOT from the attributes n the info:
+    if (currentData.hasOwnProperty("members")) {
+        newMasterRecord = "none";
+        console.log("generateNewMasterRecord: missig code for merging members to masterRecord");
+    } else { // it is a organization - lets merge it
 
 
-        if (fieldName == "categories") { // special handling of categories
-            let categories = findAllCategories(currentData);
-            if (categories != "none") { // test if categories are empty
-                newOrganizationMasterRecord.categories = categories;
-            }
 
 
-        } else { // it has to be one of the A) to C) cases
+        //let mergeRecordFieldNameArray = Object.getOwnPropertyNames(config.MERGERECORD); //get list of all properties i the MERGERECORD
+        let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
 
-            //let mergerecordFieldValue = config.MERGERECORD[fieldName]; // the field we are looking at      
-            let mergerecordFieldValue = masterRecordStructure[fieldName]; // the field we are looking at      
-            let isItObject = typeof mergerecordFieldValue == "object";
-            let isItArray = Array.isArray(mergerecordFieldValue);
+        for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
+            let fieldName = mergeRecordFieldNameArray[MergeRecordFieldNum];
 
-            let fieldNameValue;
-
-            if (isItObject && !isItArray) {
+            // now we have he field name, but we dont know if it has further properties.
+            // a property can be A) Field (num og string) B) an array C) an object containing objects/arrays D) categories
+            // we must use the fields on the jobs2processArray[readyJob].organizationNumber sbn_insighty and so on - and NOT from the attributes n the info:
 
 
-                // if it's an objet we must loop the object 
-                // first note the parent
-                let parentFieldname = mergeRecordFieldNameArray[MergeRecordFieldNum];
-                // then loop it's children
-                Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
+            if (fieldName == "categories") { // special handling of categories
+                let categories = findAllCategories(currentData);
+                if (categories != "none") { // test if categories are empty
+                    newOrganizationMasterRecord.categories = categories;
+                }
 
-                    console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
-                    //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
-                    fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
-                    if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
-                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
-                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+
+            } else { // it has to be one of the A) to C) cases
+
+                //let mergerecordFieldValue = config.MERGERECORD[fieldName]; // the field we are looking at      
+                let mergerecordFieldValue = masterRecordStructure[fieldName]; // the field we are looking at      
+                let isItObject = typeof mergerecordFieldValue == "object";
+                let isItArray = Array.isArray(mergerecordFieldValue);
+
+                let fieldNameValue;
+
+                if (isItObject && !isItArray) {
+
+
+                    // if it's an objet we must loop the object 
+                    // first note the parent
+                    let parentFieldname = mergeRecordFieldNameArray[MergeRecordFieldNum];
+                    // then loop it's children
+                    Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
+
+                        console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
+                        //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
+                        fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
+                        if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
+                            if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                                newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+                            }
+                        } else { // we need to add the parentFieldname as well
+                            if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                                newOrganizationMasterRecord[parentFieldname] = {}; // create it first
+                                newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+                            }
+
                         }
-                    } else { // we need to add the parentFieldname as well
-                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
-                            newOrganizationMasterRecord[parentFieldname] = {}; // create it first
-                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+
+
+                    });
+                } else {
+
+                    if (isItObject && isItArray) { // its an array
+
+                        //console.log("its an array");
+                        fieldNameValue = findAllArrayItems(fieldName, null, currentData);
+                        if (fieldNameValue.length > 0) {
+                            newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value(s) we found
+                        }
+
+
+                    } else { // not object and not array - just copy the key and value
+                        //fieldNameValue = findFirstField(config, fieldName, null, currentData);
+                        fieldNameValue = findFirstField(mergePriorityArray, fieldName, null, currentData);
+                        // we can get a object or just a string here. 
+                        //This means that it can also be an empty object or string - and that we do not want to store
+                        let copyValue = true;
+                        //if (fieldNameValue.constructor === Object) { // is it a object
+                        if (typeof fieldNameValue == "object") {
+                            if (Object.entries(fieldNameValue).length === 0) {
+                                copyValue = false; // its an empty object
+                            }
+                        } else {
+                            if (!fieldNameValue) {
+                                copyValue = false; // its an empty or null value
+                            }
+                        }
+
+                        if (copyValue) {
+                            newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value we found
                         }
 
                     }
 
-
-                });
-            } else {
-
-                if (isItObject && isItArray) { // its an array
-
-                    //console.log("its an array");
-                    fieldNameValue = findAllArrayItems(fieldName, null, currentData);
-                    if (fieldNameValue.length > 0) {
-                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value(s) we found
-                    }
-
-
-                } else { // not object and not array - just copy the key and value
-                    //fieldNameValue = findFirstField(config, fieldName, null, currentData);
-                    fieldNameValue = findFirstField(mergePriorityArray, fieldName, null, currentData);
-                    // we can get a object or just a string here. 
-                    //This means that it can also be an empty object or string - and that we do not want to store
-                    let copyValue = true;
-                    //if (fieldNameValue.constructor === Object) { // is it a object
-                    if (typeof fieldNameValue == "object") {
-                        if (Object.entries(fieldNameValue).length === 0) {
-                            copyValue = false; // its an empty object
-                        }
-                    } else {
-                        if (!fieldNameValue) {
-                            copyValue = false; // its an empty or null value
-                        }
-                    }
-
-                    if (copyValue) {
-                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value we found
-                    }
 
                 }
 
@@ -2265,26 +2281,21 @@ export function generateNewMasterRecord(currentData) {
             }
 
 
-        }
-
-
-    } // end looping trugh all fields in a MERGERECORD
+        } // end looping trugh all fields in a MERGERECORD
 
 
 
-    // console.log("masterRecord merged record is: ", JSON.stringify(newOrganizationMasterRecord, null, 2));
+        // console.log("masterRecord merged record is: ", JSON.stringify(newOrganizationMasterRecord, null, 2));
 
-    // then we need to look at the netwok membership
+        // then we need to look at the netwok membership
 
-    newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
+        newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
 
-    // then- before we write the update we need to put the parameters right
-    let newMasterRecord = {
-        organization: newOrganizationMasterRecord,
-        networkmemberships: newNetworkmemberships
-    };
-
-    newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+        // then- before we write the update we need to put the parameters right
+        newMasterRecord.organization= newOrganizationMasterRecord;
+        newMasterRecord.networkmemberships= newNetworkmemberships
+        newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+    }
 
     return newMasterRecord;
 
