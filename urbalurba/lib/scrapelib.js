@@ -7,7 +7,7 @@
 
 
 import axios from 'axios';
-
+import { MERGECONFIG } from "./mergeconfig.js";
 import { getNested, name2UrbalurbaIdName, string2IdKey } from "./urbalurbalib2.js";
 
 
@@ -115,15 +115,18 @@ async function getMergesByEntitytypeANDstatus(config, entitytype, jobStatus) {
 /** updateMerge
  updates a record in the merge dataset
  */
-export async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog, dataSource, exportReady ) {
+export async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog, dataSource, exportReady) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
     if (!exportReady) { //this so that we can update whitehout setting exportReady to false. It is used when writing data bask after updated Insightly
-        exportReady=false;
+        exportReady = false;
     }
+
+
+    let newMasterRecord = generateNewMasterRecord(newData);
 
     let mergeRecord = {
         idName: idName,
@@ -133,7 +136,8 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
         jobName: config.JOBNAME,
         jobLog: jobLog,
-        jobStatus: jobStatus
+        jobStatus: jobStatus,
+        masterRecord: newMasterRecord
     };
 
     if (urbalurbaIdName) {
@@ -194,7 +198,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 /** updateMergeMasterRecord
  updates a the masterReord on a merge
  */
- export async function updateMergeMasterRecord(config, newMasterRecord, jobStatus, mergeID,  jobLog) {
+export async function updateMergeMasterRecord(config, newMasterRecord, jobStatus, mergeID, jobLog) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
@@ -255,6 +259,8 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     let jobLog = null; // jobLog does not exist the first time
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
+    let newMasterRecord = generateNewMasterRecord(newData);
+
     let mergeRecord = {
         idName: idName,
         entitytype: config.ENTITYTYPE_OUTPUT,
@@ -265,7 +271,8 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
 
         jobName: config.JOBNAME,
         jobLog: jobLog,
-        jobStatus: jobStatus
+        jobStatus: jobStatus,
+        masterRecord: newMasterRecord
     };
 
     if (urbalurbaIdName) {
@@ -330,7 +337,7 @@ The attribute looks like this:
     }
 } 
  */
-function addJobLog(jobName,dataSource, jobStatus, jobLogField) {
+function addJobLog(jobName, dataSource, jobStatus, jobLogField) {
 
     if (!jobLogField) { // first time
         jobLogField = {
@@ -421,8 +428,8 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
     if (!jobStatus) jobStatus = config.JOBSTATUS_OUTPUT;
 
-    
-    let dataSource = config.DATASOURCE; 
+
+    let dataSource = config.DATASOURCE;
 
 
     let organizationNumber = null;
@@ -577,7 +584,7 @@ export async function splitNetwork2organizations(config) {
             let members = firstNetwork.data[config.DATA_SECTION_INPUT][dataSource];
 
 
-            let numUpdated = await updateMergeOrganizations(config,members, dataSource); 
+            let numUpdated = await updateMergeOrganizations(config, members, dataSource);
 
             // Finished updating - now we mark it finished
             statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
@@ -1022,7 +1029,7 @@ export async function maestro(config) {
             setJobStatus: "Ready",
             nextJobStartUrl: "https://jalla.com"
 
-        },        
+        },
         {
             number: 1,
             previousJobName: "split_network2organizations",
@@ -1388,6 +1395,17 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
         } // end if forretningsadresse
 
 
+        // then the organization
+        mergeRecord.organization = {
+            organizationNumber: mergeRecord.organizationNumber,
+            employees: getNested(oneBrregOrg, "antallAnsatte"),
+            foundedDate: getNested(oneBrregOrg, "stiftelsesdato"),
+            orgType: getNested(oneBrregOrg, "organisasjonsform", "kode") + "," + getNested(oneBrregOrg, "organisasjonsform", "beskrivelse")
+        }
+
+        let endDate = getNested(oneBrregOrg, "slettedato");
+        if (endDate) mergeRecord.organization.endDate = endDate
+
         // now the categories
         mergeRecord.categories = {};
 
@@ -1482,10 +1500,10 @@ export function member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, newData, exi
         "categories",
         "urbalurbaScrapeDate",
         "urbalurbaIdName"
- 
+
     ];
     const MEMBERSHIPFIELDSARRAY = [
-       // "networkIdName",
+        // "networkIdName",
         "networkmemberships",
         //"networkMemberTypes",
         "urbalurbaScrapeDate"
@@ -1549,7 +1567,7 @@ export function member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, newData, exi
             } else { // unknown field                
                 urbalurbaImportData[fieldName] = getNested(newData, fieldName); // get the field and store it in the urbalurbaImport
             }
-                
+
         }
 
     }
@@ -1650,7 +1668,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
                 debugger;
             } else {
                 console.log("updateMergeNetworks: Created network for:" + idName);
-                
+
             }
 
 
@@ -1815,9 +1833,9 @@ function strapi2mergeRecord(strapiRecord) {
  a organization record must be formatted as a mergeRecord
  returns the number of organizations created/updated
  */
- export async function updateMergeOrganizations(config,mergeOrganizationsArray, dataSource) {
+export async function updateMergeOrganizations(config, mergeOrganizationsArray, dataSource) {
 
-    let numUpdated =0;
+    let numUpdated = 0;
     let numCreated = 0;
     let numError = 0;
 
@@ -1920,5 +1938,360 @@ function strapi2mergeRecord(strapiRecord) {
 
     return numUpdated + numCreated;
 
- 
+
 }
+
+
+/** fieldsStartingWithFieldName
+ takes a array of fields (fieldArray) and returns all fields in the array that starts with startFieldname
+ returns an array with the ones found or an empty array if there are none.
+ */
+function fieldsStartingWithFieldName(startFieldname, fieldArray) {
+
+    let returnArray = [];
+    let lenStartFieldName = startFieldname.length;
+    returnArray = fieldArray.filter(fieldName => fieldName.slice(0, lenStartFieldName) == startFieldname); // get the matching entries
+    return returnArray;
+}
+
+
+
+function findFirstField(mergePriorityArray, fieldName, parent, currentData) {
+
+
+    let fieldNameValue;
+    let fieldValueFound = false;
+    let currentDataInfoFieldsArray = Object.getOwnPropertyNames(currentData.source); // all field names in the source: attribute
+
+    for (let priNum = 0; priNum < mergePriorityArray.length; priNum++) { // we are looking for the fields in the info: section of the data. And we are doing it in a prioriticed order
+
+        let startFieldname = mergePriorityArray[priNum]; // get the field we are looking for 
+        let fieldsArray = fieldsStartingWithFieldName(startFieldname, currentDataInfoFieldsArray); //return an array of all the fields that matches
+
+        // we now have the info fields that we are going to check if has a field name named fieldName
+
+        // this loop is looking for the fieldName in all matching attributes eg in insightly_something and insightly_somethingelse
+        for (let sourceFieldNum = 0; sourceFieldNum < fieldsArray.length; sourceFieldNum++) { // looping the array of 
+            let sourceDataFieldName = fieldsArray[sourceFieldNum]; // name of the attribute in the info:
+
+            let sourceData = currentData.source[sourceDataFieldName]; //the record we are going to search eg insightly_something
+
+
+            // now - if the field has a parent we need to include that in the getNested
+            if (parent) {
+                fieldNameValue = getNested(sourceData, parent, fieldName); // get the data stored in the fieldName
+            } else {
+                fieldNameValue = getNested(sourceData, fieldName); // get the data stored in the fieldName
+            }
+
+
+
+            if ((fieldNameValue != undefined) && (fieldNameValue != "")) { // there was a value there                
+                fieldValueFound = true;
+                break; // break out of the loop
+            }
+
+
+
+
+        } // end looping 
+
+        if (fieldValueFound) { // if we already found a fieldValue then break out of tis loop
+            break;
+        }
+
+    } // end loopin trugh all fields in the info:
+
+    return fieldNameValue;
+}
+
+
+/** findAllArrayItems
+ takes a fieldName and searches trugh all attributes inside the currentData.
+ when found it stores all values found in an array. This array is returned.
+ If the fieldName is not found an empty array is returned. 
+ */
+function findAllArrayItems(fieldName, parent, currentData) {
+
+    let arrayValues = [];
+    let fieldNameValue;
+
+    let currentDataSourceFieldsArray = Object.getOwnPropertyNames(currentData.source); // all field names in the source: attribute
+
+
+    for (let sourceFieldNum = 0; sourceFieldNum < currentDataSourceFieldsArray.length; sourceFieldNum++) { // looping the array of source: attributes
+        let sourceDataFieldName = currentDataSourceFieldsArray[sourceFieldNum]; // name of the attribute in the source:
+        let sourceData = currentData.source[sourceDataFieldName]; //the record we are going to search eg insightly_something
+
+        // now - if the field has a parent we need to include that in the getNested
+        if (parent) {
+            fieldNameValue = getNested(sourceData, parent, fieldName); // get the data stored in the fieldName
+        } else {
+            fieldNameValue = getNested(sourceData, fieldName); // get the data stored in the fieldName
+        }
+
+        if (fieldNameValue != undefined) { // there was a value there                
+
+            if (Array.isArray(fieldNameValue)) { // check if it is an array 
+
+                for (let i = 0; i < fieldNameValue.length; i++) { // loop the array
+                    arrayValues.push(fieldNameValue[i]);
+                }
+
+            } else {
+                // thats a problem - we expect the field to be a array
+            }
+
+        }
+
+
+
+    } // end looping the array of info: attributes
+
+    arrayValues = removeDuplicatesInArray(arrayValues);
+    return arrayValues;
+}
+
+
+/** findAllCategories
+ looks at the "categories" attributes for all attributes in the source: section 
+ returns "none" is there are no categories
+ */
+function findAllCategories(currentData) {
+
+    let foundCategories = false;
+
+    let mergedCategories = {}; // where we store all categories
+
+    let currentDataSourceFieldsArray = Object.getOwnPropertyNames(currentData.source); // all field names in the source: attribute
+
+    for (let sourceFieldNum = 0; sourceFieldNum < currentDataSourceFieldsArray.length; sourceFieldNum++) { // looping the array of source: attributes
+        let sourceDataFieldName = currentDataSourceFieldsArray[sourceFieldNum]; // name of the attribute in the source:
+        let sourceData = currentData.source[sourceDataFieldName]; //the record we are going to search eg insightly_something
+
+        // now - if the field has a parent we need to include that in the getNested
+        let categoriesData = getNested(sourceData, "categories"); // get the categories 
+
+
+        if (categoriesData != undefined) { // there was a value there                
+
+            let categoryNamesArray = Object.getOwnPropertyNames(categoriesData); // names of all categories
+            for (let catCount = 0; catCount < categoryNamesArray.length; catCount++) { //loop all categories
+                let categoryFieldName = categoryNamesArray[catCount]; // name of the category
+                let categoryAnswers = categoriesData[categoryFieldName]; // the array with all answers
+
+                if (mergedCategories.hasOwnProperty(categoryFieldName)) { // the categoryFieldName property is there
+                    // next we loop categoryAnswers and add them to the categoryFieldName
+                    for (let answerCount = 0; answerCount < categoryAnswers.length; answerCount++) {
+                        mergedCategories[categoryFieldName].push(categoryAnswers[answerCount]);
+                    }
+                    mergedCategories[categoryFieldName] = removeDuplicatesInArray(mergedCategories[categoryFieldName]);
+                    foundCategories = true;
+                } else { // we need to add the categoryFieldName as well
+                    mergedCategories[categoryFieldName] = []; // create it first
+                    // next we loop categoryAnswers and add them to the categoryFieldName
+                    for (let answerCount = 0; answerCount < categoryAnswers.length; answerCount++) {
+                        mergedCategories[categoryFieldName].push(categoryAnswers[answerCount]);
+                    }
+                    mergedCategories[categoryFieldName] = removeDuplicatesInArray(mergedCategories[categoryFieldName]);
+                    foundCategories = true;
+                }
+
+            } // end looping categories
+        } else { // the attribute does not contain categories
+            //just ignore it - keep searching
+        }
+
+    } // end looping the array of info: attributes
+
+    if (foundCategories) {
+        return mergedCategories;
+    } else
+        return "none";
+
+
+}
+
+/** findAllNetworkmemberships
+ takes the data.memberships as parameter. For each property here it return the networkmemberships.
+ This so that there is a unique list of networks in an array. Should always return items in the array
+  - if not then there s something wron with the program that added the organization. 
+ */
+function findAllNetworkmemberships(memberships) {
+
+    let newNetworkmemberships = [];
+
+    let membershipFieldsArray = Object.getOwnPropertyNames(memberships); // all field names in the memberships: attribute    
+
+
+    for (let membFieldNum = 0; membFieldNum < membershipFieldsArray.length; membFieldNum++) { // looping the array of memberships: attributes
+        let membFieldName = membershipFieldsArray[membFieldNum]; // name of the attribute in the info:
+        let memberData = memberships[membFieldName]; //the record we are going to search eg insightly_something
+
+        let networkmemberships = getNested(memberData, "networkmemberships"); // get the networkmemberships array
+
+
+        if (networkmemberships != undefined) { // there was a value there                
+
+            // now loop an push the values to newNetworkmemberships
+            for (let netCount = 0; netCount < networkmemberships.length; netCount++) { //loop all networks
+                newNetworkmemberships.push(networkmemberships[netCount]);
+            }
+
+        } else { // There was no networks
+            console.log("findAllNetworkmemberships: membFieldName:" + membFieldName + " has no networkmembership!")
+        }
+
+    } // end looping the array of info: attributes
+
+
+    newNetworkmemberships = removeDuplicatesInArray(newNetworkmemberships);
+
+    return newNetworkmemberships;
+
+
+}
+
+
+
+/** removeDuplicatesInArray
+ takes an array and return an array with no duplicates
+ */
+function removeDuplicatesInArray(data) {
+    return [...new Set(data)]
+}
+
+
+/** generateNewMasterRecord
+takes the .data part (currentData) of a merge record and returns a masterRecord (that is a merge of the data)
+all fields defined in masterRecordStructure is included in the returned in te new masterRecord
+ */
+export function generateNewMasterRecord(currentData) {
+
+    let masterRecordStructure = MERGECONFIG.masterRecord;
+    let mergePriorityArray = MERGECONFIG.mergepriority;
+
+    let newOrganizationMasterRecord = {}; // where we store the default data we find on a organization
+    let newNetworkmemberships = []; // where we store the networks the organization is member of
+
+    //let mergeRecordFieldNameArray = Object.getOwnPropertyNames(config.MERGERECORD); //get list of all properties i the MERGERECORD
+    let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
+
+    for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
+        let fieldName = mergeRecordFieldNameArray[MergeRecordFieldNum];
+
+        // now we have he field name, but we dont know if it has further properties.
+        // a property can be A) Field (num og string) B) an array C) an object containing objects/arrays D) categories
+        // we must use the fields on the jobs2processArray[readyJob].organizationNumber sbn_insighty and so on - and NOT from the attributes n the info:
+
+
+        if (fieldName == "categories") { // special handling of categories
+            let categories = findAllCategories(currentData);
+            if (categories != "none") { // test if categories are empty
+                newOrganizationMasterRecord.categories = categories;
+            }
+
+
+        } else { // it has to be one of the A) to C) cases
+
+            //let mergerecordFieldValue = config.MERGERECORD[fieldName]; // the field we are looking at      
+            let mergerecordFieldValue = masterRecordStructure[fieldName]; // the field we are looking at      
+            let isItObject = typeof mergerecordFieldValue == "object";
+            let isItArray = Array.isArray(mergerecordFieldValue);
+
+            let fieldNameValue;
+
+            if (isItObject && !isItArray) {
+
+
+                // if it's an objet we must loop the object 
+                // first note the parent
+                let parentFieldname = mergeRecordFieldNameArray[MergeRecordFieldNum];
+                // then loop it's children
+                Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
+
+                    console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
+                    //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
+                    fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
+                    if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
+                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+                        }
+                    } else { // we need to add the parentFieldname as well
+                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                            newOrganizationMasterRecord[parentFieldname] = {}; // create it first
+                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
+                        }
+
+                    }
+
+
+                });
+            } else {
+
+                if (isItObject && isItArray) { // its an array
+
+                    //console.log("its an array");
+                    fieldNameValue = findAllArrayItems(fieldName, null, currentData);
+                    if (fieldNameValue.length > 0) {
+                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value(s) we found
+                    }
+
+
+                } else { // not object and not array - just copy the key and value
+                    //fieldNameValue = findFirstField(config, fieldName, null, currentData);
+                    fieldNameValue = findFirstField(mergePriorityArray, fieldName, null, currentData);
+                    // we can get a object or just a string here. 
+                    //This means that it can also be an empty object or string - and that we do not want to store
+                    let copyValue = true;
+                    //if (fieldNameValue.constructor === Object) { // is it a object
+                    if (typeof fieldNameValue == "object") {
+                        if (Object.entries(fieldNameValue).length === 0) {
+                            copyValue = false; // its an empty object
+                        }
+                    } else {
+                        if (!fieldNameValue) {
+                            copyValue = false; // its an empty or null value
+                        }
+                    }
+
+                    if (copyValue) {
+                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value we found
+                    }
+
+                }
+
+
+            }
+
+
+        }
+
+
+    } // end looping trugh all fields in a MERGERECORD
+
+
+
+    // console.log("masterRecord merged record is: ", JSON.stringify(newOrganizationMasterRecord, null, 2));
+
+    // then we need to look at the netwok membership
+
+    newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
+
+    // then- before we write the update we need to put the parameters right
+    let newMasterRecord = {
+        organization: newOrganizationMasterRecord,
+        networkmemberships: newNetworkmemberships
+    };
+
+    newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+
+    return newMasterRecord;
+
+
+}
+
+
+
+
+
