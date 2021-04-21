@@ -7,10 +7,10 @@ import slugify from "slugify"
 // the idName from the rest of the url.
 // see example under with  URL_SEPARATOR = "@" 
 // eg: "smartfredrikstad.no" and "elektrisk-passasjerferge" will be http://localhost/id/smartfredrikstad.no@elektrisk-passasjerferge
-export const URL_SEPARATOR="~";
+export const URL_SEPARATOR = "~";
 
-export const ORGANIZATION_ENTITYTYPE="organization"; //corresponds with the entitytype defined in CATEGORIES_URL
-export const DEFAULT_PARENT_IDNAME="urbalurba.no"; //if an entity has no parent and is not a ORGANIZATION_ENTITYTYPE then this is the default parent it will belong to
+export const ORGANIZATION_ENTITYTYPE = "organization"; //corresponds with the entitytype defined in CATEGORIES_URL
+export const DEFAULT_PARENT_IDNAME = "urbalurba.no"; //if an entity has no parent and is not a ORGANIZATION_ENTITYTYPE then this is the default parent it will belong to
 
 
 
@@ -871,10 +871,10 @@ export function replaceItemInArray(itemToReplace, newItem, theArray) {
 
   let returnArray = [];
   theArray.map(currentItem => {
-      if (currentItem == itemToReplace)
-          returnArray.push(newItem);
-      else
-          returnArray.push(currentItem);
+    if (currentItem == itemToReplace)
+      returnArray.push(newItem);
+    else
+      returnArray.push(currentItem);
   });
 
   return returnArray;
@@ -884,6 +884,8 @@ export function replaceItemInArray(itemToReplace, newItem, theArray) {
 takes an array and returns all items that starts with the string startStr
 returns an array of the items that starts with startStr or an empty array
 a item that is returned in the array must have minimum 2 char langht
+
+returns an array if theArray is an array. othervise ""
 */
 export function filterArray(startStr, theArray) {
 
@@ -892,7 +894,9 @@ export function filterArray(startStr, theArray) {
   let networkIdName = "";
   const startStrLen = startStr.length;
 
-  theArray.map(currentItem => {
+  if (Array.isArray(theArray)) {
+
+    theArray.map(currentItem => {
       n = currentItem.indexOf(startStr);
       if (n == 0) { // it is at the start
         networkIdName = currentItem.substring(startStrLen);
@@ -901,9 +905,12 @@ export function filterArray(startStr, theArray) {
           returnArray.push(networkIdName);
         }
       }
-  });
+    });
 
-  return returnArray;
+    return returnArray;
+
+  } else
+    return "";
 }
 
 
@@ -932,10 +939,10 @@ function companyName2displayName(companyName) {
 
 
   const removeEndings = [
-      " ASA",
-      " AS",
-      " AB",
-      " IKS"
+    " ASA",
+    " AS",
+    " AB",
+    " IKS"
   ];
 
   let tmpCompanyName = ""
@@ -946,14 +953,14 @@ function companyName2displayName(companyName) {
 
   for (let i = 0; i < removeEndings.length; i++) {
 
-      if (tmpCompanyName.endsWith(removeEndings[i])) {
-          pos = tmpCompanyName.lastIndexOf(removeEndings[i]);
-          if (-1 != pos) {
-              companyName = companyName.slice(0, pos);
-              tmpCompanyName = tmpCompanyName.slice(0, pos);
-              break; // stop looping
-          }
+    if (tmpCompanyName.endsWith(removeEndings[i])) {
+      pos = tmpCompanyName.lastIndexOf(removeEndings[i]);
+      if (-1 != pos) {
+        companyName = companyName.slice(0, pos);
+        tmpCompanyName = tmpCompanyName.slice(0, pos);
+        break; // stop looping
       }
+    }
 
 
   }

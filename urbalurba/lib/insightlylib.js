@@ -1843,6 +1843,53 @@ export async function updateInsightlyOrganization(insightlyRecord) {
 
 };
 
+
+/** createInsightlyOrganization
+ * updates a organization in Insightly. 
+ * WARNING a full insightlyRecord must be provided, complete with all fields.
+ * All fields that are not provided will be deleted if they exist in Insightly database.
+ * 
+ *
+ */
+export async function createInsightlyOrganization(insightlyRecord) {
+
+    let data = "none";
+    let result;
+
+    insightlyRecord.ORGANISATION_ID = 0; //make sure we create a new one
+
+    try {
+
+        result = await axios(
+            {
+                url: INSIGHTLY_ORGANIZATION_URL,
+                method: 'post',
+                auth: {
+                    username: INSIGHTLY_APIKEY
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify(insightlyRecord)
+            }
+        );
+        data = result.data;
+
+    }
+    catch (e) {
+        console.error("1.9 createInsightlyOrganization catch error (" + insightlyRecord.ORGANISATION_NAME + "): ", JSON.stringify(e, null, 2), " =>result is: ", JSON.stringify(result, null, 2));
+        debugger
+    }
+
+    return data;
+
+};
+
+
+
+
+
+
 /** getInsightlyOrganization
  * gets a organization in Insightly. 
  
@@ -2056,7 +2103,7 @@ async function updateInsightlyOrganizationTags(organisation_id, tagsArray) {
  * If tagName does not exist then the tagName is added to the tagArray
  If all is fine the tagArray is returned - if something goes wrong then "none" is returned.
  */
-function setInsightlyTag(tagName, tagArray) {
+export function setInsightlyTag(tagName, tagArray) {
 
     //TODO: check for illegal chars in tag. This can create problems later when writing 
 
@@ -2192,6 +2239,16 @@ function setInsightlyCustomField(customFieldName, customFieldValue, insightlyRec
             }
 
         }
+    } else { // there was not a property named "CUSTOMFIELDS" - this is the first custom field
+        insightlyRecord.CUSTOMFIELDS = []; // create the array
+        let newCustomField = {
+            "CUSTOM_FIELD_ID": customFieldName,
+            "CUSTOM_FIELD_NAME": customFieldName,
+            "FIELD_VALUE": customFieldValue
+        };
+        insightlyRecord.CUSTOMFIELDS.push(newCustomField); // add it to the array               
+        returnRecord = newCustomField;
+
     }
 
     return returnRecord;
@@ -2399,31 +2456,42 @@ function insightlyGetEmailDomains(insightlyRecord) {
 
 
 /** string2array 
- * converts string separated by comma to array and removes leading and tailing blanks
+ * converts string separated by comma to array 
+ * and removes leading and tailing blanks.
+ * if the mystring is empty - then it returns "" othervise an array
  * 
 */
 function string2array(mystring) {
-    var tempArrray = new Array();
-    if (mystring) {
-        tempArrray = mystring.split(",");
 
-        // we got the array. Now remove blanks 
-        for (var i = 0; i < tempArrray.length; i++) {
-            tempArrray[i] = tempArrray[i].trim();
+    if (mystring != "") {
+        var tempArrray = new Array();
+        if (mystring) {
+            tempArrray = mystring.split(",");
+
+            // we got the array. Now remove blanks 
+            for (var i = 0; i < tempArrray.length; i++) {
+                tempArrray[i] = tempArrray[i].trim();
+            }
         }
-    }
-    return tempArrray
+        return tempArrray
+    } else
+        return "";
+
 }
 
 /** orgType2array
  * converts a single string value to an single item in an array
+ * if the mystring is empty - then it returns "" othervise an array
  */
 function orgType2array(mystring) {
-    var tempArrray = new Array();
-    mystring = mystring.trim(); //remove blanks if any
-    tempArrray.push(mystring);
+    if (mystring != "") {
+        var tempArrray = new Array();
+        mystring = mystring.trim(); //remove blanks if any
+        tempArrray.push(mystring);
 
-    return tempArrray
+        return tempArrray
+    } else
+        return "";
 }
 
 
@@ -2883,9 +2951,43 @@ async function getAllInsightlyNetworks() {
 
 };
 
+/** getAllInsightlyOrganizationsByIdName
+ * reads all organizations in insightly that has a idName
+ * there should be just ONE or none
+ */
+export async function getAllInsightlyOrganizationsByIdName(idName) {
+
+    let insightlyRequestURL = INSIGHTLY_IDNAME_SEARCH_URL + idName;
+    let data;
+    let result;
+
+    try {
+        result = await axios.get(insightlyRequestURL, {
+            auth: {
+                username: INSIGHTLY_APIKEY
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        console.error("1.9 getAllInsightlyOrganizationsByIdName catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(result));
+        debugger
+    }
+
+    return data;
+
+};
+
+
+
+
+
 /** readNetworksFromInsightly
  * reads all organizations marked as networks from insightly 
  * and converts them to merge records and add network fields. 
+ * to indicate that members of a network is to be synced the sbn_insightly is set to "insightlysync"
+ * 
  * Returns an array of network records - or an empty array if there are none
  */
 
@@ -2915,6 +3017,7 @@ export async function readNetworksFromInsightly() {
 
         if (networkMemberTypes) currentMergeRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
 
+        currentMergeRecord.sbn_insightly = "insightlysync"
 
         returnArray.push(currentMergeRecord);
     }
@@ -3456,176 +3559,268 @@ export function insightly2mergeRecord(insightlyRecord) {
         mergeRecord.displayName = insightlyRecord.ORGANISATION_NAME.toString();
         mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
 
+        let tmpResult = ""; // we are using this to test for blank fields. Fields that are blank should NOT be part of the mergeRecord
 
-        mergeRecord.slogan = getInsightlyCustomField("slogan", insightlyRecord);
-        mergeRecord.summary = getInsightlyCustomField("summary", insightlyRecord);
-        mergeRecord.description = insightlyRecord.BACKGROUND;
-        mergeRecord.web = insightlyRecord.WEBSITE;
-        mergeRecord.phone = insightlyRecord.PHONE;
-        mergeRecord.email = getInsightlyCustomField("ORGANIZATION_EMAIL", insightlyRecord);
-        mergeRecord.location = {
-            "visitingAddress": {
-                "street": insightlyRecord.ADDRESS_SHIP_STREET,
-                "city": insightlyRecord.ADDRESS_SHIP_CITY,
-                "postcode": insightlyRecord.ADDRESS_SHIP_POSTCODE,
-                "country": insightlyRecord.ADDRESS_SHIP_COUNTRY
-            },
-            "adminLocation": {
-                "countyName": getInsightlyCustomField("LOCATION_FYLKENAVN", insightlyRecord).toString(),
-                "countyId": getInsightlyCustomField("LOCATION_FYLKENUMMER", insightlyRecord).toString(),
-                "municipalityId": getInsightlyCustomField("LOCATION_KOMMUNENUMMER", insightlyRecord).toString(),
-                "municipalityName": getInsightlyCustomField("LOCATION_KOMMUNENAVN", insightlyRecord).toString()
-            }
-        };
+        tmpResult = getInsightlyCustomField("slogan", insightlyRecord);
+        if (tmpResult) {
+            mergeRecord.slogan = tmpResult;
+        }
 
+        tmpResult = getInsightlyCustomField("summary", insightlyRecord);
+        if (tmpResult) {
+            mergeRecord.summary = tmpResult;
+        }
 
-        mergeRecord.organizationNumber = getInsightlyCustomField("Organisasjonsnummer", insightlyRecord).toString();
-        mergeRecord.sbn_insightly = insightlyRecord.ORGANISATION_ID.toString();
+        tmpResult = insightlyRecord.BACKGROUND;
+        if (tmpResult) {
+            mergeRecord.description = tmpResult;
+        }
 
+        tmpResult = insightlyRecord.WEBSITE;
+        if (tmpResult) {
+            mergeRecord.web = tmpResult;
+        }
 
-        mergeRecord.domains = insightlyGetEmailDomains(insightlyRecord);
+        tmpResult = insightlyRecord.PHONE;
+        if (tmpResult) {
+            mergeRecord.phone = tmpResult;
+        }
 
 
+        tmpResult = getInsightlyCustomField("ORGANIZATION_EMAIL", insightlyRecord);
+        if (tmpResult) {
+            mergeRecord.email = tmpResult;
+        }
+
+        tmpResult = getInsightlyCustomField("Organisasjonsnummer", insightlyRecord).toString();
+        if (tmpResult) {
+            mergeRecord.organizationNumber = tmpResult;
+        }
+
+
+        tmpResult = insightlyRecord.ORGANISATION_ID.toString();
+        if (tmpResult) {
+            mergeRecord.sbn_insightly = tmpResult;
+        }
+
+        tmpResult = insightlyGetEmailDomains(insightlyRecord);
+        if (tmpResult.length > 0) {
+            mergeRecord.domains = tmpResult;
+        }
+
+
+
+        // location stuff
+        // thing here is that we need to check for presens of one or more field before we create the .location attribute
+        let street = insightlyRecord.ADDRESS_SHIP_STREET;
+        let city = insightlyRecord.ADDRESS_SHIP_CITY;
+        let postcode = insightlyRecord.ADDRESS_SHIP_POSTCODE;
+        let country = insightlyRecord.ADDRESS_SHIP_COUNTRY;
+        let countyName = getInsightlyCustomField("LOCATION_FYLKENAVN", insightlyRecord).toString();
+        let countyId = getInsightlyCustomField("LOCATION_FYLKENUMMER", insightlyRecord).toString();
+        let municipalityId = getInsightlyCustomField("LOCATION_KOMMUNENUMMER", insightlyRecord).toString();
+        let municipalityName = getInsightlyCustomField("LOCATION_KOMMUNENAVN", insightlyRecord).toString();
         let lat = getInsightlyCustomField("LOCATION_LATITUDE", insightlyRecord).toString();
-        if (lat) { //we have an gps address
-            mergeRecord.location.latLng = {
-                "lat": lat,
-                "lng": getInsightlyCustomField("LOCATION_LONGITUDE", insightlyRecord).toString()
+        let lng = getInsightlyCustomField("LOCATION_LONGITUDE", insightlyRecord).toString();
+        if (street || city || postcode || country || countyName || countyId || municipalityId || municipalityName || lat || lng) {
+            mergeRecord.location = {}; // there are fields
+
+            if (street || city || postcode || country) {
+                mergeRecord.location.visitingAddress = {};
+                if (street) {
+                    mergeRecord.location.visitingAddress.street = street;
+                }
+                if (city) {
+                    mergeRecord.location.visitingAddress.city = city;
+                }
+                if (postcode) {
+                    mergeRecord.location.visitingAddress.postcode = postcode;
+                }
+                if (country) {
+                    mergeRecord.location.visitingAddress.country = country;
+                }
             }
-        }
 
+            if (countyName || countyId || municipalityId || municipalityName) {
+                mergeRecord.location.adminLocation = {};
 
+                if (countyName) {
+                    mergeRecord.location.adminLocation.countyName = countyName;
+                }
+                if (countyId) {
+                    mergeRecord.location.adminLocation.countyId = countyId;
+                }
+                if (municipalityId) {
+                    mergeRecord.location.adminLocation.municipalityId = municipalityId;
+                }
+                if (municipalityName) {
+                    mergeRecord.location.adminLocation.municipalityName = municipalityName;
+                }
+            }
 
-        let foundedDate = getInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", insightlyRecord).toString();
-        if (foundedDate == "") { //its empty
-            foundedDate = null;
-        } else { // strapi dates are like this "2021-01-01"
-            //no need to format
-        }
+            if (lat || lng) {
+                mergeRecord.location.latLng = {};
 
-        let endDate = getInsightlyCustomField("BRREG_DELETE_DATE", insightlyRecord).toString();
-        if (endDate == "") { //its empty
-            endDate = null;
-        } else { // strapi dates are like this "2021-01-01"
-            //no need to format
-        }
-
-        mergeRecord.brreg = {
-            "organizationNumber": parseInt(getInsightlyCustomField("Organisasjonsnummer", insightlyRecord)),
-            "employees": parseInt(getInsightlyCustomField("BRREG_EMPLOYEES", insightlyRecord)),
-            "foundedDate": foundedDate,
-            "endDate": endDate,
-            "orgType": getInsightlyCustomField("BRREG_ORGTYPE", insightlyRecord).toString()
-
-        }
-
-
-
-
-        mergeRecord.image = {
-            "profile": getInsightlyCustomField("CKAN_LOGO_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE)
-        };
-
-
-        let coverImageURL = getInsightlyCustomField("COVER_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
-        if (coverImageURL != "") {
-            mergeRecord.image.cover = coverImageURL
-        }
-
-        let iconImageURL = getInsightlyCustomField("ICON_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
-        if (iconImageURL != "") {
-            mergeRecord.image.icon = iconImageURL
-        }
-
-        let squareImageURL = getInsightlyCustomField("SQUARE_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
-        if (squareImageURL != "") {
-            mergeRecord.image.square = squareImageURL
-        }
-
-
-
-        mergeRecord.insightlyTags = string2array(insightlyGetTags(insightlyRecord));
-
-        mergeRecord.categories = {}; //empty
-
-
-
-        let tmpTag = string2array(getInsightlyCustomField("member_tags", insightlyRecord).replace(/;/g, ',')); //the .replace changes ; to ,
-        let tmpSector = orgType2array(getInsightlyCustomField("organization_type", insightlyRecord));
-        let tmpSdg = string2array(getInsightlyCustomField("Sustainable_Development_Goals", insightlyRecord).replace(/;/g, ','));
-        let tmpIndustry = string2array(getInsightlyCustomField("organization_segments", insightlyRecord).replace(/;/g, ','));
-        let tmpChallenge = string2array(getInsightlyCustomField("problems_solved", insightlyRecord).replace(/;/g, ','));
-
-        //next thing to do is to convert all categories and tags to valid idName's
-        // eg the challenge contains "Enhanced data collection" this must be converted to "enhanced-data-collection"
-
-
-        //we are only going to add .categories that has values 
-        if (tmpTag != "") {
-            mergeRecord.categories.tag = convertCategoryitems2Keys(tmpTag);
-        }
-        if (tmpSector != "") {
-            mergeRecord.categories.sector = convertCategoryitems2Keys(tmpSector);
-        }
-        if (tmpSdg != "") {
-            mergeRecord.categories.sdg = convertCategoryitems2Keys(tmpSdg);
-        }
-        if (tmpIndustry != "") {
-            mergeRecord.categories.industry = convertCategoryitems2Keys(tmpIndustry);
-        }
-        if (tmpChallenge != "") {
-            mergeRecord.categories.challenge = convertCategoryitems2Keys(tmpChallenge);
-        }
-
-
-
-
-
-        //in my dyslectic rambelings I have missspelled water as wather
-        if (tmpIndustry != "") {
-            mergeRecord.categories.industry = replaceItemInArray("wather", "water", mergeRecord.categories.industry);
-        }
-
-
-        // the insightlyRecord.BACKGROUND is null if empty - make it an empty string
-        if (insightlyRecord.BACKGROUND == null)
-            mergeRecord.description = "";
-
-
-        // the insightlyRecord.WEBSITE is null if empty - make it an empty string
-        if (insightlyRecord.WEBSITE == null)
-            mergeRecord.url = "";
-
-
-        // the insightlyRecord.PHONE is null if empty - make it an empty string
-        if (insightlyRecord.PHONE == null)
-            mergeRecord.phone = "";
-
-
-        // if we do not have a valid address then we set the address to Å in Røst municipality
-        if (insightlyRecord.ADDRESS_SHIP_STREET == null || insightlyRecord.ADDRESS_SHIP_CITY == null || insightlyRecord.ADDRESS_SHIP_POSTCODE == null || insightlyRecord.ADDRESS_SHIP_COUNTRY == null) {
-            mergeRecord.location = {
-                "visitingAddress": {
-                    "street": "Å vegen 5",
-                    "city": "Sørvågen",
-                    "postcode": "8392",
-                    "country": "Norway"
+                if (lat) {
+                    mergeRecord.location.latLng.lat = lat;
+                }
+                if (lng) {
+                    mergeRecord.location.latLng.lng = lng;
                 }
             }
         }
 
 
 
+        // brreg stuff
+        let foundedDate = getInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", insightlyRecord).toString();
+        let endDate = getInsightlyCustomField("BRREG_DELETE_DATE", insightlyRecord).toString();
+        let organizationNumber = getInsightlyCustomField("Organisasjonsnummer", insightlyRecord); // removed parseInt
+        let employees = getInsightlyCustomField("BRREG_EMPLOYEES", insightlyRecord); // removed parseInt
+        let orgType = getInsightlyCustomField("BRREG_ORGTYPE", insightlyRecord).toString();
 
-        //Insightly organization is not using the summary field yet. So copy the description field for now
-        if (mergeRecord.summary == "")
-            mergeRecord.summary = mergeRecord.description.substring(0, FIELD_SUMMARY_MAXCHAR);
+        /* not sure why this was here - remove it
+                 if (foundedDate == "") { //its empty
+                    foundedDate = null;
+                } else { // strapi dates are like this "2021-01-01"
+                    //no need to format
+                }        
+                if (endDate == "") { //its empty
+                    endDate = null;
+                } else { // strapi dates are like this "2021-01-01"
+                    //no need to format
+                }
+         */
 
-        // the summary cannot be empty. In Insightly that might be the case. So fix it
-        if (mergeRecord.summary == "") {
-            console.log("empty description/summary field in Insightly for: ", mergeRecord.idName);
-            mergeRecord.summary = "missing text";
+        if (foundedDate || endDate || organizationNumber || employees || orgType) { // there are one or more defined
+            mergeRecord.brreg = {}; // create the attribute
+
+            if (foundedDate) {
+                mergeRecord.brreg.foundedDate = foundedDate;
+            }
+            if (endDate) {
+                mergeRecord.brreg.endDate = endDate;
+            }
+            if (organizationNumber) {
+                mergeRecord.brreg.organizationNumber = organizationNumber;
+            }
+            if (employees) {
+                mergeRecord.brreg.employees = employees;
+            }
+            if (orgType) {
+                mergeRecord.brreg.orgType = orgType;
+            }
         }
+
+
+        // image fields
+        let profileImageURL = getInsightlyCustomField("CKAN_LOGO_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE)
+        let coverImageURL = getInsightlyCustomField("COVER_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        let iconImageURL = getInsightlyCustomField("ICON_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        let squareImageURL = getInsightlyCustomField("SQUARE_IMAGE", insightlyRecord).toString().replace(INSIGHTLY_OLD_IMAGE, INSIGHTLY_NEW_IMAGE);
+        if (profileImageURL || coverImageURL || iconImageURL || squareImageURL) { // if there is one or more image
+            mergeRecord.image = {}; // create the property
+
+            if (profileImageURL) {
+                mergeRecord.image.profile = profileImageURL
+            }
+            if (coverImageURL) {
+                mergeRecord.image.cover = coverImageURL
+            }
+            if (iconImageURL) {
+                mergeRecord.image.icon = iconImageURL
+            }
+            if (squareImageURL) {
+                mergeRecord.image.square = squareImageURL
+            }
+        }
+
+        // insightly tags
+        let tmpTagArray = string2array(insightlyGetTags(insightlyRecord));
+        if (tmpTagArray.length > 0) {
+            mergeRecord.insightlyTags = tmpTagArray;
+        }
+
+
+
+        // the categories
+        let tmpTag = string2array(getInsightlyCustomField("member_tags", insightlyRecord).replace(/;/g, ',')); //the .replace changes ; to ,
+        let tmpSector = orgType2array(getInsightlyCustomField("organization_type", insightlyRecord));
+        let tmpSdg = string2array(getInsightlyCustomField("Sustainable_Development_Goals", insightlyRecord).replace(/;/g, ','));
+        let tmpIndustry = string2array(getInsightlyCustomField("organization_segments", insightlyRecord).replace(/;/g, ','));
+        let tmpChallenge = string2array(getInsightlyCustomField("problems_solved", insightlyRecord).replace(/;/g, ','));
+        if (tmpTag || tmpSector || tmpSdg || tmpIndustry || tmpChallenge) { // if there is one or more category        
+            mergeRecord.categories = {}; //empty
+
+            //next thing to do is to convert all categories and tags to valid idName's
+            // eg the challenge contains "Enhanced data collection" this must be converted to "enhanced-data-collection"
+
+            //we are only going to add .categories that has values 
+            if (tmpTag) {
+                mergeRecord.categories.tag = convertCategoryitems2Keys(tmpTag);
+            }
+            if (tmpSector) {
+                mergeRecord.categories.sector = convertCategoryitems2Keys(tmpSector);
+            }
+            if (tmpSdg) {
+                mergeRecord.categories.sdg = convertCategoryitems2Keys(tmpSdg);
+            }
+            if (tmpIndustry) {
+                mergeRecord.categories.industry = convertCategoryitems2Keys(tmpIndustry);
+            }
+            if (tmpChallenge) {
+                mergeRecord.categories.challenge = convertCategoryitems2Keys(tmpChallenge);
+            }
+            //in my dyslectic rambelings I have missspelled water as wather
+            if (tmpIndustry) {
+                mergeRecord.categories.industry = replaceItemInArray("wather", "water", mergeRecord.categories.industry);
+            }
+        }
+
+
+        /* why this ?        REMOVE IT
+                // the insightlyRecord.BACKGROUND is null if empty - make it an empty string
+                if (insightlyRecord.BACKGROUND == null )
+                    mergeRecord.description = "";
+        
+        
+                // the insightlyRecord.WEBSITE is null if empty - make it an empty string
+                if (insightlyRecord.WEBSITE == null)
+                    mergeRecord.url = "";
+        
+        
+                // the insightlyRecord.PHONE is null if empty - make it an empty string
+                if (insightlyRecord.PHONE == null)
+                    mergeRecord.phone = "";
+        
+        
+                // if we do not have a valid address then we set the address to Å in Røst municipality
+                if (insightlyRecord.ADDRESS_SHIP_STREET == null || insightlyRecord.ADDRESS_SHIP_CITY == null || insightlyRecord.ADDRESS_SHIP_POSTCODE == null || insightlyRecord.ADDRESS_SHIP_COUNTRY == null) {
+                    mergeRecord.location = {
+                        "visitingAddress": {
+                            "street": "Å vegen 5",
+                            "city": "Sørvågen",
+                            "postcode": "8392",
+                            "country": "Norway"
+                        }
+                    }
+                }
+        
+        
+        
+        
+                //Insightly organization is not using the summary field yet. So copy the description field for now
+                if (mergeRecord.summary == "")
+                    mergeRecord.summary = mergeRecord.description.substring(0, FIELD_SUMMARY_MAXCHAR);
+        
+                // the summary cannot be empty. In Insightly that might be the case. So fix it
+                if (mergeRecord.summary == "") {
+                    console.log("empty description/summary field in Insightly for: ", mergeRecord.idName);
+                    mergeRecord.summary = "missing text";
+                }
+        
+        */
+
 
 
         // adding temp fields to strapiRecord that will be used to figure out if the og has ben updated 
@@ -3640,48 +3835,72 @@ export function insightly2mergeRecord(insightlyRecord) {
         if (insightlyRecord.SOCIAL_LINKEDIN) {
             socialLinks.linkedin = insightlyRecord.SOCIAL_LINKEDIN
         }
-
         if (insightlyRecord.SOCIAL_FACEBOOK) {
             socialLinks.facebook = insightlyRecord.SOCIAL_FACEBOOK
         }
-
         if (insightlyRecord.SOCIAL_TWITTER) {
             socialLinks.twitter = insightlyRecord.SOCIAL_TWITTER
         }
-
         let insightlyInstagram = getInsightlyCustomField("SOCIAL_INSTRAGRAM", insightlyRecord);
-        if (insightlyInstagram != "") {
+        if (insightlyInstagram) {
             socialLinks.instagram = insightlyInstagram
         }
-
         let insightlyYoutube = getInsightlyCustomField("SOCIAL_YOUTUBE", insightlyRecord);
-        if (insightlyYoutube != "") {
+        if (insightlyYoutube) {
             socialLinks.youtube = insightlyYoutube
         }
 
 
 
         //if there are no social links, then we set socialLinks= null othwevise we ass the socialLinks object
-        if (Object.keys(socialLinks).length === 0 && socialLinks.constructor === Object)
-            mergeRecord.socialLinks = null;
-        else
+        if (Object.keys(socialLinks).length === 0 && socialLinks.constructor === Object) {
+            // DONT PUT EMPTY mergeRecord.socialLinks = null;
+        } else
             mergeRecord.socialLinks = socialLinks;
 
 
         //Get the insightly tags
         let insightlyTagString = insightlyGetTags(insightlyRecord);
-        // convet to array 
-        let insightlyTagArray = string2array(insightlyTagString);
-        //copy only the array items that starts with INSIGHTLY_NETWORKTAGCHAR
-        let insightlyNetworksArray = filterArray(INSIGHTLY_NETWORKTAGCHAR, insightlyTagArray)
-        // then return the result
-        mergeRecord.networkmemberships = insightlyNetworksArray;
+        if (insightlyTagString) {
+            let insightlyTagArray = string2array(insightlyTagString); // convert to array         
+            let insightlyNetworksArray = filterArray(INSIGHTLY_NETWORKTAGCHAR, insightlyTagArray); //copy only the array items that starts with INSIGHTLY_NETWORKTAGCHAR        
+            mergeRecord.networkmemberships = insightlyNetworksArray; // then return the result
+        }
+
+
 
         // get and copy the tags that the members added
         let insightlyMemberTags = getInsightlyCustomField("member_tags", insightlyRecord).toString();
-        mergeRecord.tags = string2array(insightlyMemberTags);
+        if (insightlyMemberTags) {
+            mergeRecord.tags = string2array(insightlyMemberTags);
+        }
 
 
+        // web page links
+        let newsPage = getInsightlyCustomField("ENTITYTYPE_ARTICLE", insightlyRecord);
+        let projectsPage = getInsightlyCustomField("ENTITYTYPE_PROJECT", insightlyRecord);
+        let solutionsPage = getInsightlyCustomField("ENTITYTYPE_SOLUTION", insightlyRecord);
+        let membersPage = getInsightlyCustomField("ENTITYTYPE_ORGANIZATION", insightlyRecord);
+        let eventsPage = getInsightlyCustomField("ENTITYTYPE_EVENT", insightlyRecord);
+        if (newsPage || projectsPage || solutionsPage || membersPage || eventsPage) { // if there is one or more page        
+            mergeRecord.pages = {}; //empty
+
+            if (newsPage) {
+                mergeRecord.pages.news = newsPage;
+            }
+            if (projectsPage) {
+                mergeRecord.pages.projects = projectsPage;
+            }
+            if (solutionsPage) {
+                mergeRecord.pages.solutions = solutionsPage;
+            }
+            if (membersPage) {
+                mergeRecord.pages.members = membersPage;
+            }
+            if (eventsPage) {
+                mergeRecord.pages.events = eventsPage;
+            }
+        }
 
 
     } else
@@ -3722,6 +3941,7 @@ export function insightlyArray2mergeArray(insightlyArray) {
  !! be aware that when updating insightly a full record must be written - fields that are not there is lost
  To prevent loss of data the function thakes a template insighty record (existingInsightlyRecord) - so read the record first then use this function
 
+
 A insightly record looks like this
 https://api.insightly.com/v3.1/Organisations/98965342
 
@@ -3739,9 +3959,9 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
     // if there a mergeRecord.organization.sbn_insightly - it should be if the data is structured correct
     tmpResult = getNested(mergeRecord, "organization", "sbn_insightly");
-    if (tmpResult) { // its there
+    if (tmpResult != undefined) { // its there
 
-        if (mergeRecord.organization.sbn_insightly && (mergeRecord.organization.sbn_insightly == existingInsightlyRecord.ORGANISATION_ID)) { // if it exists in insightly 
+        if (mergeRecord.organization.sbn_insightly == existingInsightlyRecord.ORGANISATION_ID) { // if it exists in insightly 
 
             //organization_type is ???? 
             //TODO: setCustomFieldResult = setInsightlyCustomField("organization_type", mergeRecord.organizationNumber, updatedInsightlyRecord);    
@@ -3751,64 +3971,64 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
 
             tmpResult = getNested(mergeRecord, "organization", "displayName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ORGANISATION_NAME = tmpResult;
             }
 
             tmpResult = getNested(mergeRecord, "organization", "description");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.BACKGROUND = tmpResult;
             }
 
             tmpResult = getNested(mergeRecord, "organization", "phone");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.PHONE = tmpResult;
             }
 
             tmpResult = getNested(mergeRecord, "organization", "web");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.WEBSITE = tmpResult;
             }
 
             tmpResult = getNested(mergeRecord, "organization", "domain");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.EMAIL_DOMAIN = tmpResult;
             }
-                  
+
             //the social fields
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "linkedin");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.SOCIAL_LINKEDIN = tmpResult;
             }
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "facebook");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.SOCIAL_FACEBOOK = tmpResult;
             }
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "twitter");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.SOCIAL_TWITTER = tmpResult;
             }
 
 
-        // the location fields            
+            // the location fields            
             tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "street");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ADDRESS_SHIP_STREET = tmpResult;
             }
             tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "city");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ADDRESS_SHIP_CITY = tmpResult;
             }
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ADDRESS_SHIP_STATE = tmpResult;
             }
             tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "postcode");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ADDRESS_SHIP_POSTCODE = tmpResult;
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "location", "visitingAddress", "country");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 updatedInsightlyRecord.ADDRESS_SHIP_COUNTRY = tmpResult;
             }
 
@@ -3819,29 +4039,29 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
             //the adminLocation fields
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_FYLKENAVN", tmpResult, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyId");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_FYLKENUMMER", tmpResult, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_KOMMUNENAVN", tmpResult, updatedInsightlyRecord);
             }
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_KOMMUNENUMMER", tmpResult, updatedInsightlyRecord);
             }
 
             // the GPS fields
             tmpResult = getNested(mergeRecord, "organization", "location", "latLng", "lat");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_LATITUDE", tmpResult, updatedInsightlyRecord);
             }
             tmpResult = getNested(mergeRecord, "organization", "location", "latLng", "lng");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("LOCATION_LONGITUDE", tmpResult, updatedInsightlyRecord);
             }
 
@@ -3849,153 +4069,182 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
             //the custom social fields
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "instagram");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("SOCIAL_INSTRAGRAM", tmpResult, updatedInsightlyRecord);
             }
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "youtube");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("SOCIAL_YOUTUBE", tmpResult, updatedInsightlyRecord);
             }
             tmpResult = getNested(mergeRecord, "organization", "socialLinks", "otherURL");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("SOCIAL_OTHER", tmpResult, updatedInsightlyRecord);
             }
-            
+
             //slogan            
             tmpResult = getNested(mergeRecord, "organization", "slogan");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("slogan", tmpResult, updatedInsightlyRecord);
             }
 
             // summary 
             tmpResult = getNested(mergeRecord, "organization", "summary");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("summary", tmpResult, updatedInsightlyRecord);
             }
 
             //email
             tmpResult = getNested(mergeRecord, "organization", "email");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("ORGANIZATION_EMAIL", tmpResult, updatedInsightlyRecord);
             }
-            
+
             //CKAN_NAME is the idName
             tmpResult = getNested(mergeRecord, "organization", "idName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", tmpResult, updatedInsightlyRecord);
             }
 
             //fylke is  countyName
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("fylke", tmpResult, updatedInsightlyRecord);
-            }            
+            }
 
             //kommunenr is  countyName
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("kommunenr", tmpResult, updatedInsightlyRecord);
-            }            
-            
+            }
+
             //Organisasjonsnummer is organizationNumber 
             tmpResult = getNested(mergeRecord, "organization", "organizationNumber");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("Organisasjonsnummer", tmpResult, updatedInsightlyRecord);
-            }            
-                        
+            }
+
 
 
 
             //TODO: change brreg fields
             tmpResult = getNested(mergeRecord, "organization", "brreg", "employees");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_EMPLOYEES", tmpResult, updatedInsightlyRecord);
-            }            
-                         
+            }
+
             tmpResult = getNested(mergeRecord, "organization", "brreg", "orgType");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_ORGTYPE", tmpResult, updatedInsightlyRecord);
-            }            
-            
+            }
+
             tmpResult = getNested(mergeRecord, "organization", "brreg", "foundedDate");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", tmpResult, updatedInsightlyRecord);
-            }            
-            
+            }
+
             tmpResult = getNested(mergeRecord, "organization", "brreg", "endDate");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_DELETE_DATE", tmpResult, updatedInsightlyRecord);
-            }            
-                        
-            
+            }
+
+
 
             // images
             tmpResult = getNested(mergeRecord, "organization", "image", "profile");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("CKAN_LOGO_IMAGE", tmpResult, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "image", "cover");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("COVER_IMAGE", tmpResult, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "image", "icon");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("ICON_IMAGE", tmpResult, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "image", "square");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("SQUARE_IMAGE", tmpResult, updatedInsightlyRecord);
-            }            
-            
-            
-            
+            }
+
+
+
 
 
             // fields that are in the categories 
             tmpResult = getNested(mergeRecord, "organization", "categories", "sector");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 let sector = categoryArray2string(tmpResult, ";");
                 setCustomFieldResult = setInsightlyCustomField("organization_type", sector, updatedInsightlyRecord);
-            }            
+            }
             tmpResult = getNested(mergeRecord, "organization", "categories", "tag");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 let member_tags = categoryArray2string(tmpResult, ";");
                 setCustomFieldResult = setInsightlyCustomField("member_tags", member_tags, updatedInsightlyRecord);
-            }            
-         
+            }
+
             tmpResult = getNested(mergeRecord, "organization", "categories", "sdg");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 let Sustainable_Development_Goals = categoryArray2string(tmpResult, ",");
                 setCustomFieldResult = setInsightlyCustomField("Sustainable_Development_Goals", Sustainable_Development_Goals, updatedInsightlyRecord);
-            }      
-            
+            }
+
 
             tmpResult = getNested(mergeRecord, "organization", "categories", "industry");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 let organization_segments = categoryArray2string(tmpResult, ";");
                 setCustomFieldResult = setInsightlyCustomField("organization_segments", organization_segments, updatedInsightlyRecord);
-            }   
+            }
             tmpResult = getNested(mergeRecord, "organization", "categories", "challenge");
-            if (tmpResult) { // its there
+            if (tmpResult != undefined) { // its there
                 let problems_solved = categoryArray2string(tmpResult, ";");
                 setCustomFieldResult = setInsightlyCustomField("problems_solved", problems_solved, updatedInsightlyRecord);
-            }            
-            
+            }
+
 
 
             //EMAILDOMAINS
             tmpResult = getNested(mergeRecord, "organization", "domains");
-            if (tmpResult) { // its there
-                updatedInsightlyRecord.EMAILDOMAINS = mergeDomains2insightly(tmpResult, updatedInsightlyRecord.EMAILDOMAINS);                    
-            }            
+            if (tmpResult != undefined) { // its there                
+                updatedInsightlyRecord.EMAILDOMAINS = mergeDomains2insightly(tmpResult, updatedInsightlyRecord.EMAILDOMAINS);
+            } else { //insightly require the domain to be listed in EMAILDOMAINS as well
+                updatedInsightlyRecord.EMAILDOMAINS = [{ "EMAIL_DOMAIN": updatedInsightlyRecord.EMAIL_DOMAIN }];
+            }
 
-            
+            // web page links            
+            tmpResult = getNested(mergeRecord, "organization", "pages", "news");
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ENTITYTYPE_ARTICLE", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "pages", "projects");
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ENTITYTYPE_PROJECT", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "pages", "solutions");
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ENTITYTYPE_SOLUTION", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "pages", "members");
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ENTITYTYPE_ORGANIZATION", tmpResult, updatedInsightlyRecord);
+            }
+            tmpResult = getNested(mergeRecord, "organization", "pages", "events");
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("ENTITYTYPE_EVENT", tmpResult, updatedInsightlyRecord);
+            }
+
+
+
 
             //TAGS is the way we define what network the org is member of
             tmpResult = getNested(mergeRecord, "networkmemberships");
-            if (tmpResult) { // its there                
-                updatedInsightlyRecord.TAGS = mergeNetworkmemberships2insightly(tmpResult, updatedInsightlyRecord.TAGS);
-            }            
+            if (tmpResult != undefined) { // its there   
+                let tmpTags = mergeNetworkmemberships2insightly(tmpResult, updatedInsightlyRecord.TAGS);
+                if (tmpTags.length > 0) { // if there are tags
+                    updatedInsightlyRecord.TAGS = tmpTags
+                }
+            }
+
 
 
 
@@ -4056,22 +4305,35 @@ function mergeDomains2insightly(mergeDomains, exisistingInsightyDomains) {
     let returnInsightlyDomains = [];
     let foundIndex;
 
-    if (Array.isArray(mergeDomains)) { // and it is an array
+    if (Array.isArray(mergeDomains) && Array.isArray(exisistingInsightyDomains)) { // both are arrays
 
         for (let i = 0; i < mergeDomains.length; i++) {
             foundIndex = 0;
             foundIndex = exisistingInsightyDomains.findIndex(domain => domain.EMAIL_DOMAIN == mergeDomains[i]);
             if (foundIndex >= 0) { // its there
-                returnInsightlyDomains.push(exisistingInsightyDomains[foundIndex]); // its already there - keep it
+                returnInsightlyDomains.push(exisistingInsightyDomains[foundIndex]); // its already there - keep it IMPORTANT we kep its EMAIL_DOMAIN_ID
             } else {
                 let domainRecord = {
-                    "EMAIL_DOMAIN": tagName
+                    "EMAIL_DOMAIN": mergeDomains[i] // we dont have a EMAIL_DOMAIN_ID because it is new
                 }
                 returnInsightlyDomains.push(domainRecord)
             }
         }
 
+    } else { // at least one of tem are not arrays
+        if (Array.isArray(mergeDomains) && !Array.isArray(exisistingInsightyDomains)) { // mergedomains is an array, but exisistingInsightyDomains is not
+            // this is when we import an org - it has nothing and we just add
+            for (let i = 0; i < mergeDomains.length; i++) { // loop all domains and just add them
+                let domainRecord = {
+                    "EMAIL_DOMAIN": mergeDomains[i] // we dont have a EMAIL_DOMAIN_ID because it is new
+                }
+                returnInsightlyDomains.push(domainRecord)
+            }
+        }
+
+
     }
+
 
     return returnInsightlyDomains;
 
@@ -4091,19 +4353,24 @@ function mergeNetworkmemberships2insightly(networkmemberships, exisistingInsight
 
     let returnInsightlyTags = [];
 
-    //first copy all tags that is not a network. 
-    for (let i = 0; i < exisistingInsightyTags.length; i++) {
-        if (INSIGHTLY_NETWORKTAGCHAR != exisistingInsightyTags[i].TAG_NAME.slice(0, 1)) {
-            returnInsightlyTags.push(exisistingInsightyTags[i])
+    if (exisistingInsightyTags) { // if there are existing tags
+        //first copy all tags that is not a network. 
+        for (let i = 0; i < exisistingInsightyTags.length; i++) {
+            if (INSIGHTLY_NETWORKTAGCHAR != exisistingInsightyTags[i].TAG_NAME.slice(0, 1)) {
+                returnInsightlyTags.push(exisistingInsightyTags[i])
+            }
         }
+
     }
 
-    // then add the networkmemberships as tags
-    for (let i = 0; i < networkmemberships.length; i++) {
-        let tagRecord = {
-            "TAG_NAME": INSIGHTLY_NETWORKTAGCHAR + networkmemberships[i]
+    if (networkmemberships) { // if there is a array of networks 
+        // then add the networkmemberships as tags
+        for (let i = 0; i < networkmemberships.length; i++) {
+            let tagRecord = {
+                "TAG_NAME": INSIGHTLY_NETWORKTAGCHAR + networkmemberships[i]
+            }
+            returnInsightlyTags.push(tagRecord)
         }
-        returnInsightlyTags.push(tagRecord)
     }
 
     return returnInsightlyTags;
