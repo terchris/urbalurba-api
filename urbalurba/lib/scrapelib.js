@@ -1378,7 +1378,13 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
             };
             tmpResult = getNested(oneBrregOrg, "forretningsadresse", "adresse");
             if (tmpResult) { // its there
-                mergeRecord.location.visitingAddress.street = tmpResult[0];
+                // there might be a c/o address here. 
+                if(tmpResult.length > 1) { // there is a c/o address - select the next line
+                    mergeRecord.location.visitingAddress.street = tmpResult[1];    
+                } else { // there is just one address line. - select it
+                    mergeRecord.location.visitingAddress.street = tmpResult[0];
+                }
+                
             }
             tmpResult = getNested(oneBrregOrg, "forretningsadresse", "poststed");
             if (tmpResult) { // its there
@@ -2301,8 +2307,3 @@ export function generateNewMasterRecord(currentData) {
 
 
 }
-
-
-
-
-
