@@ -2330,7 +2330,7 @@ export function generateNewMasterRecord(currentData) {
                     // then loop it's children
                     Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
 
-                        console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
+                        //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
                         //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
                         fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
                         if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
