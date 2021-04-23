@@ -8,7 +8,7 @@
 
 import axios from 'axios';
 import { MERGECONFIG } from "./mergeconfig.js";
-import { getNested, name2UrbalurbaIdName, string2IdKey } from "./urbalurbalib2.js";
+import { getNested, name2UrbalurbaIdName, string2IdKey, companyName2displayName } from "./urbalurbalib2.js";
 
 
 const MERGE_DATASET = "merges";
@@ -127,7 +127,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
 
     let newMasterRecord = generateNewMasterRecord(newData);
-    if(newMasterRecord == "none") newMasterRecord= null;
+    if (newMasterRecord == "none") newMasterRecord = null;
 
     let mergeRecord = {
         idName: idName,
@@ -261,7 +261,7 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
     let newMasterRecord = generateNewMasterRecord(newData);
-    if(newMasterRecord == "none") newMasterRecord= null;
+    if (newMasterRecord == "none") newMasterRecord = null;
 
     let mergeRecord = {
         idName: idName,
@@ -1048,7 +1048,7 @@ export async function maestro(config) {
             nextJobName: "brreg_orgnum2merge,brreg_web2merge", //brreg-name
             setJobStatus: "Ready",
             nextJobStartUrl: "https://jalla.com"
-        },        
+        },
         {
             jobId: "brreg_orgnum2merge_automatic", //after sucessful lookup using orgnum send it to merge_automatic
             previousJobName: "brreg_orgnum2merge",
@@ -1336,7 +1336,7 @@ if there is a end date slettedato then the field endDate is added to organizatio
 
 
  */
-export function brreg2mergeRecord(brregRecord, hjemmeside) {
+export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizationName) {
 
     let tmpResult = "";
     let mergeRecord = {};
@@ -1354,46 +1354,138 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
 
     // first figure out if we have more than one response
     totalElements = getNested(brregRecord, "page", "totalElements");
-    if (totalElements) { // The brregRecord is from a  web search 
-        if (totalElements > 1) { // yes we have more than one result 
+    if (totalElements) { // The brregRecord is from a  web search or a name search
 
-            let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
-            let brregWebEnheter = []; // for storing the result enheter that actually has the hjemmeside 
-            for (let j = 0; j < brregEnheter.length; j++) { //loop the org's returned
+        if (searchHjemmeside) { //its from a homepage search
 
-                let fixHjemmeside = brregEnheter[j].hjemmeside.toLowerCase();
-                fixHjemmeside = stripWebUrl(fixHjemmeside); //we need to do this because the hjemmeside sometimes has a ending "/"
-                if (fixHjemmeside == hjemmeside.toLowerCase()) {
-                    brregWebEnheter.push(brregEnheter[j]); // if it is the same - then we keep it
+            if (totalElements > 1) { // yes we have more than one result 
+
+                let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
+                let brregWebEnheter = []; // for storing the result enheter that actually has the hjemmeside 
+                for (let j = 0; j < brregEnheter.length; j++) { //loop the org's returned
+
+                    let fixHjemmeside = brregEnheter[j].hjemmeside.toLowerCase();
+                    fixHjemmeside = stripWebUrl(fixHjemmeside); //we need to do this because the hjemmeside sometimes has a ending "/"
+                    if (fixHjemmeside == searchHjemmeside.toLowerCase()) {
+                        brregWebEnheter.push(brregEnheter[j]); // if it is the same - then we keep it
+                    }
                 }
-            }
-            if (brregWebEnheter.length == 1) { // there is just one - we select it 
-                oneBrregOrg = brregWebEnheter[0]; //slect the first and only one
-                mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
-                mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
-            } else {
+                if (brregWebEnheter.length == 1) { // there is just one - we select it 
 
-                if (brregWebEnheter.length > 1) { // there are several                        
-                    mergeRecord.urbalurbaImport = brregWebEnheter; //store them all
-                    mergeRecord.urbalurbaVerified = BRREG_MANY;
-                    mergeRecord.urbalurbaError = "Search for hjemmeside=" + hjemmeside + " resulted in:" + totalElements + " organizations";
-                } else {// there are none
-                    // the search is sending bullshit back to us
-                    // not sure what to do 
-                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + hjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!");
-                    mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + hjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!";
+                    if (stripWebUrl(brregWebEnheter[0].hjemmeside) == searchHjemmeside) { //We must make sure it is a correct 
+                        oneBrregOrg = brregWebEnheter[0]; //slect the first and only one
+                        mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+                        mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+                    } else { // brreg has sent us shit again
+                        console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
+                        mergeRecord.urbalurbaError = "Error search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + "= Not equal!";
+                        debugger;
+                    }
+
+                } else {
+
+                    if (brregWebEnheter.length > 1) { // there are several                        
+                        mergeRecord.urbalurbaImport = brregWebEnheter; //store them all
+                        mergeRecord.urbalurbaVerified = BRREG_MANY;
+                        mergeRecord.urbalurbaError = "Search for hjemmeside=" + searchHjemmeside + " resulted in:" + totalElements + " organizations";
+                    } else {// there are none
+                        // the search is sending bullshit back to us
+                        // not sure what to do 
+                        console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!");
+                        mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + searchHjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!";
+                        debugger;
+                    }
+
+                }
+
+
+            } else { //there is just one result
+                // the brreg API is messy and they send results that are not correct. 
+                if (stripWebUrl(brregRecord._embedded.enheter[0].hjemmeside) == searchHjemmeside) { //We must make sure it is a correct 
+                    oneBrregOrg = brregRecord._embedded.enheter[0]; //slect the first and only one
+                    mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+                    mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+                } else { // brreg has set us shit again
+                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
+                    mergeRecord.urbalurbaError = "Error search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + "= Not equal!";
                     debugger;
                 }
+            }
 
+        } else { // its from a organizationName search
+
+
+            // start --------- Handling search with organizationName
+
+
+
+            if (totalElements > 1) { // yes we have more than one result 
+                
+
+                let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
+                let brregNameEnheter = []; // for storing the result enheter that actually has the organizationName
+                for (let j = 0; j < brregEnheter.length; j++) { //loop the org's returned
+
+                    let fixOrganizationName = brregEnheter[j].navn.toLowerCase();
+                    fixOrganizationName = companyName2displayName(fixOrganizationName); //strip away the A/S AS IKS or whatever
+
+                    if (fixOrganizationName == searchOrganizationName) {
+                        brregNameEnheter.push(brregEnheter[j]); // if it is the same - then we keep it
+                    }
+                }
+                if (brregNameEnheter.length == 1) { // there is just one - we select it 
+                    let fixOrganizationName = brregNameEnheter[0].navn.toLowerCase();
+                    fixOrganizationName = companyName2displayName(fixOrganizationName) //strip away the A/S AS IKS or whatever
+
+                    if (fixOrganizationName == searchOrganizationName) { //We must make sure it is a correct 
+                        oneBrregOrg = brregNameEnheter[0]; //slect the first and only one
+                        mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+                        mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+                    } else { // brreg has sent us shit again
+                        console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
+                        mergeRecord.urbalurbaError = "Error search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + "= Not equal!";
+                        debugger;
+                    }
+
+                } else {
+
+                    if (brregNameEnheter.length > 1) { // there are several                        
+                        mergeRecord.urbalurbaImport = brregNameEnheter; //store them all
+                        mergeRecord.urbalurbaVerified = BRREG_MANY;
+                        mergeRecord.urbalurbaError = "Search for navn=" + searchOrganizationName + " resulted in:" + totalElements + " organizations";
+                    } else {// there are none
+                        // the search is sending bullshit back to us
+                        // not sure what to do 
+                        console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning:" + totalElements + " .NONE of them has correct navn !!");
+                        mergeRecord.urbalurbaError = "Error Search for navn=" + searchOrganizationName + "= is returning:" + totalElements + " .NONE of them has correct navn !!";
+                        debugger;
+                    }
+
+                }
+
+
+            } else { //there is just one result
+                // the brreg API is messy and they send results that are not correct. 
+                let fixOrganizationName = brregRecord._embedded.enheter[0].navn.toLowerCase();
+                fixOrganizationName = companyName2displayName(fixOrganizationName); //strip away the A/S AS IKS or whatever
+                if (fixOrganizationName == searchOrganizationName) { //We must make sure it is a correct 
+                    oneBrregOrg = brregRecord._embedded.enheter[0]; //slect the first and only one
+                    mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
+                    mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
+                } else { // brreg has set us shit again
+                    console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
+                    mergeRecord.urbalurbaError = "Error search for navn=" + searchOrganizationName + "= is returning hjemmeisde=" + brregRecord._embedded.enheter[0].navn + "= Not equal!";
+                    debugger;
+                }
             }
 
 
-        } else { //there is just one result
-            oneBrregOrg = brregRecord._embedded.enheter[0]; //slect the first and only one
-            mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
-            mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
-        }
 
+
+
+
+            // stop ----
+        }
     } else { // The brregRecord is from org number lookup
         oneBrregOrg = brregRecord; // the record contains just one
         mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"
@@ -1446,11 +1538,11 @@ export function brreg2mergeRecord(brregRecord, hjemmeside) {
             tmpResult = getNested(oneBrregOrg, "forretningsadresse", "adresse");
             if (tmpResult != undefined) { // its there
                 // there might be a c/o address here. 
-                if(tmpResult.length > 1) { // there is a c/o address - select the next line
-                    mergeRecord.location.visitingAddress.street = tmpResult[1];    
+                if (tmpResult.length > 1) { // there is a c/o address - select the next line
+                    mergeRecord.location.visitingAddress.street = tmpResult[1];
                 } else { // there is just one address line. - select it
                     mergeRecord.location.visitingAddress.street = tmpResult[0];
-                }             
+                }
             }
             tmpResult = getNested(oneBrregOrg, "forretningsadresse", "poststed");
             if (tmpResult != undefined) { // its there
@@ -1916,7 +2008,7 @@ function strapi2mergeRecord(strapiRecord) {
  a organization record must be formatted as a mergeRecord
  returns the number of organizations created/updated
  */
- export async function updateMergeOrganizations(config, mergeOrganizationsArray, dataSource) {
+export async function updateMergeOrganizations(config, mergeOrganizationsArray, dataSource) {
 
     let numUpdated = 0;
     let numCreated = 0;
@@ -2330,7 +2422,7 @@ export function generateNewMasterRecord(currentData) {
                     // then loop it's children
                     Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
 
-                        //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
+                        console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
                         //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
                         fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
                         if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
@@ -2399,8 +2491,8 @@ export function generateNewMasterRecord(currentData) {
         newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
 
         // then- before we write the update we need to put the parameters right
-        newMasterRecord.organization= newOrganizationMasterRecord;
-        newMasterRecord.networkmemberships= newNetworkmemberships
+        newMasterRecord.organization = newOrganizationMasterRecord;
+        newMasterRecord.networkmemberships = newNetworkmemberships
         newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
     }
 

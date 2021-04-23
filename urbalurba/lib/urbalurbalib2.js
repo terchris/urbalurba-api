@@ -935,14 +935,27 @@ export function name2UrbalurbaIdName(displayName) {
 /** companyName2displayName
  takes a company name and removes AS or ASA eg "Fjordkraft AS" becomes "Fjordkraft"
  */
-function companyName2displayName(companyName) {
+export function companyName2displayName(companyName) {
 
 
   const removeEndings = [
     " ASA",
     " AS",
     " AB",
-    " IKS"
+    " IKS",
+    " ANS",
+    " BA",
+    " BBL",
+    " BRL",
+    " DA",
+    " ENK",
+    " KF",
+    " KS",
+    " NUF",
+    " ORGL",
+    " SA",
+
+
   ];
 
   let tmpCompanyName = ""

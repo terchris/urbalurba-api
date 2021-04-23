@@ -248,3 +248,49 @@ export async function getOrgByWeb(domainName) {
 
 }
 
+/** getOrgByName
+ * Takes a organizationName like siemens  - if found a organization is returned
+ * Returns "none" is there are no org by that name
+ The data returned is described here https://data.brreg.no/enhetsregisteret/api/docs/index.html#enheter-oppslag
+ */
+ export async function getOrgByName(organizationName) {
+
+
+    const BRREG_ENHETER_URL = "https://data.brreg.no/enhetsregisteret/api/enheter/";
+    let brregRequestURL;
+
+    let data = "none";
+    let response;
+
+
+    if (organizationName) { // has value and is not null 
+
+        organizationName = encodeURIComponent(organizationName); // encode it correctly
+        brregRequestURL = BRREG_ENHETER_URL + "?navn=" + organizationName;
+        
+
+        try {
+            response = await axios.get(brregRequestURL);
+
+            if (response.data.page.totalElements > 0) { // there is a result set            
+                data = response.data; // return the one that is there
+            } else {
+                console.log("err getOrgByName noone registered with name:", organizationName);
+            }
+
+        }
+        catch (e) {
+            console.error("1.9 getOrgByName catch error:", JSON.stringify(e, null, 2));
+            debugger
+        }
+
+
+    } else { //no organizationName parameter
+        data = "none";
+    }
+
+
+    return data;
+
+}
+
