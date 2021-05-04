@@ -2,6 +2,7 @@
 
 import { IMAGEANDCOLOR } from "./libconfig.js";
 import slugify from "slugify"
+import { nanoid } from 'nanoid'; // to create unique id for urbalurbaIdName
 
 // URL_SEPARATOR when creating a valid global URL we need to have a way to separate 
 // the idName from the rest of the url.
@@ -916,7 +917,7 @@ export function filterArray(startStr, theArray) {
 
 /** name2UrbalurbaIdName
 takes a name and converts it to a urbalurba idName
-returns a idName 
+returns a idName + an unique id. eg "-IRFa-VaY2b"
 
  */
 export function name2UrbalurbaIdName(displayName) {
@@ -926,7 +927,8 @@ export function name2UrbalurbaIdName(displayName) {
 
   displayName = string2IdKey(displayName);
 
-
+  let id = nanoid(10); // 10 char id eg: "-IRFa-VaY2b"
+  displayName = displayName + "-" + id;
   return displayName;
 
 }
@@ -1016,7 +1018,7 @@ export function string2IdKey(idKey) {
 
     idKey = slugify(idKey, {
       replacement: '-',  // replace spaces with replacement character, defaults to `-`
-      remove: /[*+~()'"!:@/]/g, // remove characters that match regex, defaults to `undefined`
+      remove: /[*+~(),'"!:@/]/g, // remove characters that match regex, defaults to `undefined`
       lower: true,      // convert to lower case, defaults to `false`
       strict: false,     // strip special characters except replacement, defaults to `false`
       locale: 'no'       // language code of the locale to use
