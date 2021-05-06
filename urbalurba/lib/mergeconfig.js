@@ -1,4 +1,32 @@
 export const MERGECONFIG = {
+    "mergefieldpriority":{
+        "visitingAddress": [
+            "insightly",
+            "strapi",
+            "brreg", // Notice for this field brreg has higher priority than members_
+            "members_",
+            "geonorge",
+            "webpage_"
+        ],
+        "summary": [
+            "insightly",
+            "strapi",
+            "webpage_", // Notice for this field webpage_ has higher priority than brreg
+            "brreg", 
+            "members_",
+            "geonorge",
+            
+        ],
+        "description": [
+            "insightly",
+            "strapi",
+            "webpage_", // Notice for this field webpage_ has higher priority than brreg
+            "brreg", 
+            "members_",
+            "geonorge",
+            
+        ],
+    },
     "mergepriority": [
         "insightly",
         "strapi",
@@ -9,13 +37,6 @@ export const MERGECONFIG = {
     ],
     "masterRecord": {
         "domain": "ae.no",
-        "brreg": {
-            "endDate": "2050-04-14",
-            "orgType": "AS,Aksjeselskap",
-            "employees": 167,
-            "foundedDate": "2000-04-14",
-            "organizationNumber": 981952324
-        },
         "sbn_insightly": "95521295",
         "idName": "ae.no",
         "summary": "Agder Energi foredler og forvalter fornybar energi. Konsernets virksomhet omfatter produksjon, distribusjon og salg av fornybar energi, samt energitilknyttede tjenester. Vår visjon er å være et ledend",

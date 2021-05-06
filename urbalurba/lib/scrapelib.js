@@ -1,7 +1,7 @@
 /* functions for 
 - communication with strapi backend
 - converting+++
-8apr21- in the urbalurba-api
+8apr21- in the urbalurba-api..
 */
 
 
@@ -1250,6 +1250,46 @@ export function stripWebUrl(web) {
 
 }
 
+
+
+/** bareWebUrl
+ * takes a web address. verifies that it is a legal address.
+ *  and removes the path eg from http://www.sol.no/something to http://www.sol.no/
+ * valid web address is returned - if not then "" is returned
+ */
+export function bareWebUrl(web) {
+
+    let returnBareWebUrl = "";
+
+    if ((web != "") && (web != null) && (web != undefined)) { // there is a web address
+
+        web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
+
+        try {
+            let tmpUrl = new URL(web); // can cause error if it is not a valid web address
+            let hostname = tmpUrl.hostname;
+
+            if (hostname) {
+                returnBareWebUrl = tmpUrl.protocol + "//" + hostname;
+            }
+        }
+        catch (e) { // the web address is not valid
+            console.log("Invalid web:" + web);
+        }
+
+    }
+
+    return returnBareWebUrl;
+
+}
+
+
+
+
+
+
+
+
 /** brreg2MergeRecord
 convers a brreg record to a merge record. 
  This is done so that all programs that put data into the merge record uses the same attributes
@@ -1420,7 +1460,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
 
 
             if (totalElements > 1) { // yes we have more than one result 
-                
+
 
                 let brregEnheter = getNested(brregRecord, "_embedded", "enheter");
                 let brregNameEnheter = []; // for storing the result enheter that actually has the organizationName
@@ -2131,7 +2171,7 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
             }
 
         } else {
-            console.log("splitNetwork2organizations: (" + orgCounter + ")No idName:" + idName + " skipping");
+            console.log("splitNetwork2organizations: (" + orgCounter + ")No idName:" + mergeOrganizationsArray[orgCounter].displayName + " skipping");
             debugger;
         }
 
@@ -2155,18 +2195,34 @@ function fieldsStartingWithFieldName(startFieldname, fieldArray) {
     return returnArray;
 }
 
+/** findFirstField
+ returns the value of a fieldName.  
+ It searches all of the different sources in the .source for all to see if there is a field named fieldName.
+ The source is done in a prioriticed way defined in mergePriorityArray. And the first field with the name of fieldName is returned.
+ Sometimes a field on one .source is a better source of truth and we need to prioritice the search for a spessiffic field.
+ If the field has a different search priority then it is defined in the mergeFieldPriority.
+ */
+function findFirstField(mergePriorityArray, mergeFieldPriority, fieldName, parent, currentData) {
 
 
-function findFirstField(mergePriorityArray, fieldName, parent, currentData) {
-
-
+    let priorityArray = []; // the array that defines the search order
     let fieldNameValue;
     let fieldValueFound = false;
+
+    // first we must figure out if the field has a mergeFieldPriority
+    if (mergeFieldPriority.hasOwnProperty(fieldName)) { // special priority for the field
+        priorityArray = mergeFieldPriority[fieldName]; // use the array defined for this field for prioriticing the search 
+    } else { // no special priority defined for the field
+        priorityArray = mergePriorityArray; // use the normal priority
+    }
+
+
+
     let currentDataInfoFieldsArray = Object.getOwnPropertyNames(currentData.source); // all field names in the source: attribute
 
-    for (let priNum = 0; priNum < mergePriorityArray.length; priNum++) { // we are looking for the fields in the info: section of the data. And we are doing it in a prioriticed order
+    for (let priNum = 0; priNum < priorityArray.length; priNum++) { // we are looking for the fields in the info: section of the data. And we are doing it in a prioriticed order
 
-        let startFieldname = mergePriorityArray[priNum]; // get the field we are looking for 
+        let startFieldname = priorityArray[priNum]; // get the field we are looking for 
         let fieldsArray = fieldsStartingWithFieldName(startFieldname, currentDataInfoFieldsArray); //return an array of all the fields that matches
 
         // we now have the info fields that we are going to check if has a field name named fieldName
@@ -2374,6 +2430,7 @@ export function generateNewMasterRecord(currentData) {
     let newMasterRecord = {}; // "none" if smething is not 
     let masterRecordStructure = MERGECONFIG.masterRecord;
     let mergePriorityArray = MERGECONFIG.mergepriority;
+    let mergeFieldPriority = MERGECONFIG.mergefieldpriority;
 
     let newOrganizationMasterRecord = {}; // where we store the default data we find on a organization
     let newNetworkmemberships = []; // where we store the networks the organization is member of
@@ -2386,7 +2443,7 @@ export function generateNewMasterRecord(currentData) {
 
 
 
-        //let mergeRecordFieldNameArray = Object.getOwnPropertyNames(config.MERGERECORD); //get list of all properties i the MERGERECORD
+        // first we need to get all the fields we are going to use for merging
         let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
 
         for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
@@ -2423,8 +2480,8 @@ export function generateNewMasterRecord(currentData) {
                     Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
 
                         //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
-                        //fieldNameValue = findFirstField(config, key, parentFieldname, currentData);
-                        fieldNameValue = findFirstField(mergePriorityArray, key, parentFieldname, currentData);
+                        
+                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, key, parentFieldname, currentData);
                         if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
                             if (fieldNameValue != undefined) { // only store a value if there is a value to store
                                 newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
@@ -2451,20 +2508,25 @@ export function generateNewMasterRecord(currentData) {
 
 
                     } else { // not object and not array - just copy the key and value
-                        //fieldNameValue = findFirstField(config, fieldName, null, currentData);
-                        fieldNameValue = findFirstField(mergePriorityArray, fieldName, null, currentData);
+                       
+                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority,fieldName, null, currentData);
                         // we can get a object or just a string here. 
                         //This means that it can also be an empty object or string - and that we do not want to store
+
                         let copyValue = true;
-                        //if (fieldNameValue.constructor === Object) { // is it a object
-                        if (typeof fieldNameValue == "object") {
-                            if (Object.entries(fieldNameValue).length === 0) {
-                                copyValue = false; // its an empty object
+                        if (fieldNameValue) { // we have a velue - lets examine it
+
+                            if (typeof fieldNameValue == "object") {
+                                if (Object.entries(fieldNameValue).length === 0) {
+                                    copyValue = false; // its an empty object
+                                }
+                            } else {
+                                if (!fieldNameValue) {
+                                    copyValue = false; // its an empty or null value
+                                }
                             }
-                        } else {
-                            if (!fieldNameValue) {
-                                copyValue = false; // its an empty or null value
-                            }
+                        } else { // no value
+                            copyValue = false; // its an empty or null value
                         }
 
                         if (copyValue) {
