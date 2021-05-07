@@ -1,7 +1,7 @@
 /* functions for 
 - communication with strapi backend
 - converting+++
-8apr21- in the urbalurba-api..
+7may21
 */
 
 
@@ -127,10 +127,19 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
 
     let newMasterRecord = generateNewMasterRecord(newData);
-    if (newMasterRecord == "none") newMasterRecord = null;
+
+    let newDisplayName= "not defined";
+    if (newMasterRecord == "none") {
+        newMasterRecord = null;
+    } else {
+        newDisplayName = newMasterRecord.organization.displayName; // alway use the latest displayName
+    }
+
+
 
     let mergeRecord = {
         idName: idName,
+        displayName: newDisplayName,
 
         data: newData,
         exportReady: exportReady,
@@ -143,6 +152,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
     if (urbalurbaIdName) {
         mergeRecord.urbalurbaIdName = urbalurbaIdName;
+        mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
     }
 
     if (organizationNumber) {
@@ -261,10 +271,17 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
 
     let newMasterRecord = generateNewMasterRecord(newData);
-    if (newMasterRecord == "none") newMasterRecord = null;
+
+    let newDisplayName= "not defined";
+    if (newMasterRecord == "none") {
+        newMasterRecord = null;
+    } else {
+        newDisplayName = newMasterRecord.organization.displayName; // alway use the latest displayName
+    }
 
     let mergeRecord = {
         idName: idName,
+        displayName: newDisplayName,
         entitytype: config.ENTITYTYPE_OUTPUT,
 
         data: newData,
@@ -277,8 +294,11 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
         masterRecord: newMasterRecord
     };
 
-    if (urbalurbaIdName) {
+    if (urbalurbaIdName) { // existing rcord
         mergeRecord.urbalurbaIdName = urbalurbaIdName;
+    } else { // new record
+        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(idName); // this MUST be the only call to name2UrbalurbaIdName
+        mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
     }
 
     if (organizationNumber) {
@@ -1311,7 +1331,7 @@ If more than one org is returned - thn we must do :
  
 copy field: "hjemmeside" --> "domain" and remove the www is any
 copy field: "navn" --> "displayName"
-create field: urbalurbaIdName: name2UrbalurbaIdName(displayName)
+
 copy field: "hjemmeside" --> "web" and add http://
 copy field: "organisasjonsnummer" --> "organizationNumber"
 create field: urbalurbaScrapeDate 
@@ -1551,7 +1571,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
             mergeRecord.displayName = tmpResult;
         }
 
-        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
+//JALLA delete        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
 
 
         //copy field: "hjemmeside" --> "web" and add http://
@@ -1968,7 +1988,7 @@ copy field: foreignKeys.sbn_insightly --> "sbn_insightly"
 copy field: internalImage.profile.url --> "image.profile"
 copy field: internalImage.cover.url --> "image.cover"
 copy field: internalImage.square.url --> "image.square"
-create field: urbalurbaIdName: name2UrbalurbaIdName(displayName)
+
 create field: urbalurbaScrapeDate 
 create field: networkIdName 
  */
@@ -2035,7 +2055,7 @@ function strapi2mergeRecord(strapiRecord) {
     delete strapiRecord.tags;
 
 
-    strapiRecord.urbalurbaIdName = name2UrbalurbaIdName(strapiRecord.displayName);
+//JALLA delete    strapiRecord.urbalurbaIdName = name2UrbalurbaIdName(strapiRecord.displayName);
 
     return strapiRecord;
 
@@ -2094,8 +2114,11 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 // split the information about a member into two parts. One "source" part and one "membership" part
                 newData = member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], newData);
 
-                // get all the top level ID's
+                // get all the top level ID's 
+                
+                //-- urbalurbaIdName is not defined when there is a new record -- unless we are importing from strapi or insightly
                 let urbalurbaIdName = mergeOrganizationsArray[orgCounter].urbalurbaIdName;
+
                 let organizationNumber = mergeOrganizationsArray[orgCounter].organizationNumber;
                 let sbn_insightly = mergeOrganizationsArray[orgCounter].sbn_insightly;
                 let domain = mergeOrganizationsArray[orgCounter].domain;
@@ -2422,6 +2445,7 @@ function removeDuplicatesInArray(data) {
 /** generateNewMasterRecord
 takes the .data part (currentData) of a merge record and returns a masterRecord (that is a merge of the data)
 all fields defined in masterRecordStructure is included in the returned in te new masterRecord
+Called every time something is written to the merge record
 
 returns "none" if the record is not converted;
  */
