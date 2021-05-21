@@ -1,31 +1,40 @@
 export const MERGECONFIG = {
     "mergefieldpriority":{
         "visitingAddress": [
-            "insightly",
             "strapi",
+            "insightly",            
             "brreg", // Notice for this field brreg has higher priority than members_
             "members_",
             "geonorge",
             "webpage_"
         ],
         "summary": [
-            "insightly",
             "strapi",
+            "insightly",            
             "webpage_", // Notice for this field webpage_ has higher priority than brreg
             "brreg", 
             "members_",
-            "geonorge",
-            
+            "geonorge",            
         ],
         "description": [
-            "insightly",
             "strapi",
+            "insightly",
             "webpage_", // Notice for this field webpage_ has higher priority than brreg
             "brreg", 
             "members_",
-            "geonorge",
-            
+            "geonorge",            
         ],
+        "pages": [
+            "webpage_", // Notice for this field webpage_ has the higest priority 
+            "strapi",
+            "insightly"
+        ],
+        "organization": [
+            "brreg", // Notice for this field brreg has the higest priority 
+            "strapi",
+            "insightly"
+        ],
+
     },
     "mergepriority": [
         "insightly",

@@ -1,4 +1,6 @@
 /* lib functions for accessing insightly */
+//must inlude in api
+
 import axios from 'axios';
 import dotenv from 'dotenv'
 dotenv.config()
@@ -22,7 +24,7 @@ import {
 
 
 import {
-    replaceItemInArray, filterArray, name2UrbalurbaIdName, string2IdKey, getNested
+    replaceItemInArray, filterArray, string2IdKey, getNested
 } from "./urbalurbalib2.js";
 
 
@@ -51,12 +53,13 @@ const INSIGHTLY_ORGANIZATIONSBYTAGURI = "https://api.insightly.com/v3.1/Organisa
 const INSIGHTLY_CONTACTSBYTAGURI = "https://api.insightly.com/v3.1/Contacts/SearchByTag?brief=false&top=500&count_total=false&tagName="; //`${process.env.INSIGHTLY_CONTACTSBYTAGURI}`;
 
 const INSIGHTLY_ORGANIZATION_URL = "https://api.insightly.com/v3.1/Organisations";
+const INSIGHTLY_ORGANIZATION_DOMAIN_SEARCH_URL = "https://api.insightly.com/v3.1/Organisations/Search?field_name=EMAIL_DOMAIN&brief=false&count_total=false&field_value="
 
 const INSIGHTLY_ORGANIZATION_TAGS_URI = "https://api.insightly.com/v3.1/Organisations/:ORGANISATION_ID/Tags";
 
 const INSIGHTLY_NETWORKS_URL = "https://api.insightly.com/v3.1/Organisations/Search?field_name=IsNetwork__c&field_value=true&brief=false&count_total=false"
 const INSIGHTLY_ALLORGANIZATIONSTAG = "%23urbalurba.no" // #urbalurba.no
-const INSIGHTLY_NETWORKTAGCHAR = "#";
+export const INSIGHTLY_NETWORKTAGCHAR = "#";
 
 const INSIGHTLY_CONTACT_UPDATE = "https://api.insightly.com/v3.1/Contacts";
 
@@ -74,7 +77,7 @@ export const INSIGHTLY_TAG_WEBSCRAPE_INPUT = "_web_Input";
 const INSIGHTLY_TAG_WEBSCRAPE_OK = "_web_OK";
 const INSIGHTLY_TAG_WEBSCRAPE_ERR = "_web_Err";
 
-
+export const INSIGHTLY_TAG_EXTERNAL_CREATED = "_external";
 
 // tags related to persons that will be synced to strapi
 // Persons that will be synced to strapi must have a INSIGHTLY_WEB_CONTACT tag
@@ -1771,6 +1774,7 @@ export function insightly2strapiEntityRecord(insightlyRecord, entitytypeID) {
 export async function getAllInsightlyOrganizationsByTag(tagName) {
 
 
+    tagName = encodeURIComponent(tagName); // encode it correctly
     let insightlyRequestURL = INSIGHTLY_ORGANIZATIONSBYTAGURI + tagName;
     let data = "none"
     let result;
@@ -1919,7 +1923,7 @@ export async function getInsightlyOrganization(organisation_id) {
     }
     catch (e) {
         console.error("1.9 getInsightlyOrganization catch error : ", JSON.stringify(e, null, 2), " =>result is: ", JSON.stringify(result, null, 2));
-        debugger
+        debugger //hvordan kom det feil id nr ?
     }
 
     return data;
@@ -2979,6 +2983,35 @@ export async function getAllInsightlyOrganizationsByIdName(idName) {
 
 };
 
+/** getAllInsightlyOrganizationsByDomainName
+ * reads all organizations in insightly that has the domain name
+ there might be more than one record.
+ */
+ export async function getAllInsightlyOrganizationsByDomainName(domainName) {
+
+
+    let insightlyRequestURL = INSIGHTLY_ORGANIZATION_DOMAIN_SEARCH_URL + domainName;
+    let data;
+    let result;
+
+    try {
+        result = await axios.get(insightlyRequestURL, {
+            auth: {
+                username: INSIGHTLY_APIKEY
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        console.error("1.9 getAllInsightlyOrganizationsByDomainName catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(result));
+        debugger
+    }
+
+    return data;
+
+};
+
 
 
 
@@ -3017,7 +3050,7 @@ export async function readNetworksFromInsightly() {
 
         if (networkMemberTypes) currentMergeRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
 
-        currentMergeRecord.sbn_insightly = "insightlysync"
+//JALLA: delete         currentMergeRecord.sbn_insightly = "insightlysync"
 
         returnArray.push(currentMergeRecord);
     }
@@ -3545,10 +3578,10 @@ see doc for insightly2strapiEntityRecord
  */
 export function insightly2mergeRecord(insightlyRecord) {
     let mergeRecord = {};
-
     let socialLinks = {};
 
     mergeRecord.idName = getInsightlyCustomField("CKAN_NAME", insightlyRecord).toString();
+    mergeRecord.urbalurbaIdName = getInsightlyCustomField("urbalurbaIdName", insightlyRecord).toString();
     // we also need to make sure the idName is a legal idName
     mergeRecord.idName = string2IdKey(mergeRecord.idName);
     mergeRecord.urbalurbaScrapeDate = new Date().toISOString();
@@ -3557,7 +3590,7 @@ export function insightly2mergeRecord(insightlyRecord) {
         mergeRecord.domain = mergeRecord.idName; // this is how its is defined - the domain is the id
         //mergeRecord.entitytype = entitytypeID,
         mergeRecord.displayName = insightlyRecord.ORGANISATION_NAME.toString();
-        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
+
 
         let tmpResult = ""; // we are using this to test for blank fields. Fields that are blank should NOT be part of the mergeRecord
 
@@ -3679,36 +3712,25 @@ export function insightly2mergeRecord(insightlyRecord) {
         let employees = getInsightlyCustomField("BRREG_EMPLOYEES", insightlyRecord); // removed parseInt
         let orgType = getInsightlyCustomField("BRREG_ORGTYPE", insightlyRecord).toString();
 
-        /* not sure why this was here - remove it
-                 if (foundedDate == "") { //its empty
-                    foundedDate = null;
-                } else { // strapi dates are like this "2021-01-01"
-                    //no need to format
-                }        
-                if (endDate == "") { //its empty
-                    endDate = null;
-                } else { // strapi dates are like this "2021-01-01"
-                    //no need to format
-                }
-         */
+
 
         if (foundedDate || endDate || organizationNumber || employees || orgType) { // there are one or more defined
-            mergeRecord.brreg = {}; // create the attribute
+            mergeRecord.organization = {}; // create the attribute
 
             if (foundedDate) {
-                mergeRecord.brreg.foundedDate = foundedDate;
+                mergeRecord.organization.foundedDate = foundedDate;
             }
             if (endDate) {
-                mergeRecord.brreg.endDate = endDate;
+                mergeRecord.organization.endDate = endDate;
             }
             if (organizationNumber) {
-                mergeRecord.brreg.organizationNumber = organizationNumber;
+                mergeRecord.organization.organizationNumber = organizationNumber;
             }
             if (employees) {
-                mergeRecord.brreg.employees = employees;
+                mergeRecord.organization.employees = employees;
             }
             if (orgType) {
-                mergeRecord.brreg.orgType = orgType;
+                mergeRecord.organization.orgType = orgType;
             }
         }
 
@@ -4037,6 +4059,14 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
             //CUSTOMFIELDS
             let setCustomFieldResult;
 
+
+            //the urbalurbaIdName 
+            tmpResult = getNested(mergeRecord, "organization","urbalurbaIdName",);
+            if (tmpResult != undefined) { // its there
+                setCustomFieldResult = setInsightlyCustomField("urbalurbaIdName", tmpResult, updatedInsightlyRecord);
+            }            
+
+
             //the adminLocation fields
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
             if (tmpResult != undefined) { // its there
@@ -4126,23 +4156,23 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
 
 
-            //TODO: change brreg fields
-            tmpResult = getNested(mergeRecord, "organization", "brreg", "employees");
+            //brreg is the name in insightly organization is the mergerecord field name
+            tmpResult = getNested(mergeRecord, "organization", "organization", "employees");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_EMPLOYEES", tmpResult, updatedInsightlyRecord);
             }
 
-            tmpResult = getNested(mergeRecord, "organization", "brreg", "orgType");
+            tmpResult = getNested(mergeRecord, "organization", "organization", "orgType");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_ORGTYPE", tmpResult, updatedInsightlyRecord);
             }
 
-            tmpResult = getNested(mergeRecord, "organization", "brreg", "foundedDate");
+            tmpResult = getNested(mergeRecord, "organization", "organization", "foundedDate");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_ESTABLISHMENT_DATE", tmpResult, updatedInsightlyRecord);
             }
 
-            tmpResult = getNested(mergeRecord, "organization", "brreg", "endDate");
+            tmpResult = getNested(mergeRecord, "organization", "organization", "endDate");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("BRREG_DELETE_DATE", tmpResult, updatedInsightlyRecord);
             }

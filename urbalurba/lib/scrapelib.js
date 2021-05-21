@@ -8,10 +8,25 @@
 
 import axios from 'axios';
 import { MERGECONFIG } from "./mergeconfig.js";
-import { getNested, name2UrbalurbaIdName, string2IdKey, companyName2displayName } from "./urbalurbalib2.js";
+import { 
+    getNested, 
+    name2UrbalurbaIdName, 
+    string2IdKey, 
+    companyName2displayName,
+     
+} from "./urbalurbalib2.js";
 
+import { 
+    prefixArrayObjects
+} from "./strapidatalib.js";
+
+
+export const DISPLAYLOG = true;
 
 const MERGE_DATASET = "merges";
+const MERGEJOB_DATASET = "merge-jobs";
+export const MERGEJOB_RUNNING = "Running";
+export const MERGEJOB_FINISHED = "Finished";
 
 
 /** getAllMerges
@@ -117,6 +132,7 @@ async function getMergesByEntitytypeANDstatus(config, entitytype, jobStatus) {
  */
 export async function updateMerge(config, newData, idName, jobStatus, mergeID, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, jobLog, dataSource, exportReady) {
 
+    let tmpResultArray = [];
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
     jobLog = addJobLog(config.JOBNAME, dataSource, jobStatus, jobLog);
@@ -128,7 +144,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
     let newMasterRecord = generateNewMasterRecord(newData);
 
-    let newDisplayName= "not defined";
+    let newDisplayName = idName;
     if (newMasterRecord == "none") {
         newMasterRecord = null;
     } else {
@@ -152,7 +168,9 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
 
     if (urbalurbaIdName) {
         mergeRecord.urbalurbaIdName = urbalurbaIdName;
-        mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
+        if (newMasterRecord) { // is there a new master record - this is not the case if webscraping is done before export from insightly
+            mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
+        }
     }
 
     if (organizationNumber) {
@@ -171,6 +189,21 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
         mergeRecord.web = web;
     }
 
+    if (newMasterRecord) { // if there is a master record -then we must get the domains and networkmemberships
+
+        // get the domains - if any
+        tmpResultArray = getNested(newMasterRecord, "organization","domains");
+        if ((tmpResultArray != undefined) && (tmpResultArray != null)) { // there is a domains 
+            mergeRecord.domains = prefixArrayObjects(tmpResultArray, "domainName");
+        }
+
+        // get the network(s) the entity belongs to
+        tmpResultArray = getNested(newMasterRecord, "networkmemberships");
+        if ((tmpResultArray != undefined) && (tmpResultArray != null)) {
+            mergeRecord.networkmemberships = prefixArrayObjects(tmpResultArray, "networkIdName");
+        }
+
+    }
 
 
 
@@ -265,6 +298,7 @@ export async function updateMergeMasterRecord(config, newMasterRecord, jobStatus
  */
 async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource) {
 
+    let tmpResultArray = [];
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET;
 
     let jobLog = null; // jobLog does not exist the first time
@@ -272,7 +306,7 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
 
     let newMasterRecord = generateNewMasterRecord(newData);
 
-    let newDisplayName= "not defined";
+    let newDisplayName = idName; // set it to the same as idName so that in case there is no newMasterRecord we at least have a displayName
     if (newMasterRecord == "none") {
         newMasterRecord = null;
     } else {
@@ -298,7 +332,10 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
         mergeRecord.urbalurbaIdName = urbalurbaIdName;
     } else { // new record
         mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(idName); // this MUST be the only call to name2UrbalurbaIdName
-        mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
+        if (newMasterRecord) { // is there a new master record - this is not the case if webscraping is done before export from insightly
+            mergeRecord.masterRecord.organization.urbalurbaIdName = mergeRecord.urbalurbaIdName; //put it in the master record as well
+        }
+
     }
 
     if (organizationNumber) {
@@ -316,6 +353,23 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     if (web) {
         mergeRecord.web = web;
     }
+
+    if (newMasterRecord) { // if there is a master record -then we must get the domains and networkmemberships
+
+        // get the domains - if any
+        tmpResultArray = getNested(newMasterRecord, "organization","domains");
+        if ((tmpResultArray != undefined) && (tmpResultArray != null)) { // there is a domains 
+            mergeRecord.domains = prefixArrayObjects(tmpResultArray, "domainName");
+        }
+
+        // get the network(s) the entity belongs to
+        tmpResultArray = getNested(newMasterRecord, "networkmemberships");
+        if ((tmpResultArray != undefined) && (tmpResultArray != null)) {
+            mergeRecord.networkmemberships = prefixArrayObjects(tmpResultArray, "networkIdName");
+        }
+
+    }
+
 
 
     let data = "none";
@@ -478,16 +532,16 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
 
         if (mergeRecord == "none") { // there is was an error
-            console.error("pushData: Error creating scraping for:" + idName);
+            if (DISPLAYLOG) console.error("pushData: Error creating scraping for:" + idName);
             returnResult = "Error"
         } else {
-            console.log("pushData: Created scraping for:" + idName);
+            if (DISPLAYLOG) console.log("pushData: Created scraping for:" + idName);
             returnResult = "OK"
         }
     } else { // there is a previous merge record - we will update it
 
 
-        console.log("pushData: idName:" + idName + " already has entitytype=" + entitytype);
+        //if (DISPLAYLOG) console.log("pushData: idName:" + idName + " already has entitytype=" + entitytype);
 
         let existingData = mergeArray[0].data; // pick the first one                    
         if (!existingData.hasOwnProperty(config.DATA_SECTION_OUTPUT)) { // no secttion
@@ -540,10 +594,10 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
         let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, dataSource);
 
         if (updateMergeRecordResult == "none") { // there is was an error
-            console.error("pushData: Error updating scraping for:" + idName);
+            if (DISPLAYLOG) console.error("pushData: Error updating scraping for:" + idName);
             returnResult = "Error"
         } else {
-            console.log("pushData: Updated scraping for:" + idName);
+            if (DISPLAYLOG) console.log("pushData: Updated scraping for:" + idName);
             returnResult = "OK"
         }
     }
@@ -569,7 +623,7 @@ async function getFirstReadyNetwork(config) {
     if (mergedRecordArray.length > 0) { // there are ready 
         firstMergeRecord = mergedRecordArray[0]; // we pick the first one
     } else {
-        console.log("getFirstReadyNetwork: No ready member lists");
+        //if (DISPLAYLOG) console.log("getFirstReadyNetwork: No ready member lists");
     }
 
     return firstMergeRecord;
@@ -588,47 +642,45 @@ export async function splitNetwork2organizations(config) {
     let moreReadyNetworks = true; // there might be more networks to split
     let firstNetwork = await getFirstReadyNetwork(config);
 
-
     if (firstNetwork != "none") { //we have a list to work on
+        let statusMessage = "Splitting network: " + firstNetwork.idName;
+        let canStartJob = await canStartMergeJob(config, config.JOBNAME, MERGEJOB_RUNNING, statusMessage);
+        if (canStartJob) {
 
-        let statusResult;
+            let statusResult;
 
-        statusResult = await setJobStatus(config, firstNetwork.id, config.JOBNAME, "Running", firstNetwork.jobLog); // mark the network so that we know it is running
+            statusResult = await setJobStatus(config, firstNetwork.id, config.JOBNAME, "Running", firstNetwork.jobLog); // mark the network so that we know it is running
 
-        //inside the data property there should be just one property.And that property should have the jobName of the job that created it
-        // since that can be lots of jobName's we must list them to find its name. Then pick that name
-        let dataProperties = Object.getOwnPropertyNames(firstNetwork.data[config.DATA_SECTION_INPUT]); //get list of all property names
-        let dataSource = "";
-        if (dataProperties.length > 0) {
-            dataSource = dataProperties[0]; // get the name of the job that created the property that contains the members
+            //inside the data property there should be just one property.And that property should have the jobName of the job that created it
+            // since that can be lots of jobName's we must list them to find its name. Then pick that name
+            let dataProperties = Object.getOwnPropertyNames(firstNetwork.data[config.DATA_SECTION_INPUT]); //get list of all property names
+            let dataSource = "";
+            if (dataProperties.length > 0) {
+                dataSource = dataProperties[0]; // get the name of the job that created the property that contains the members
 
-            // loop all members in the list and create one mergeRecord for each member
-            let members = firstNetwork.data[config.DATA_SECTION_INPUT][dataSource];
+                // loop all members in the list and create one mergeRecord for each member
+                let members = firstNetwork.data[config.DATA_SECTION_INPUT][dataSource];
 
+                let numUpdated = await updateMergeOrganizations(config, members, dataSource);
 
-            let numUpdated = await updateMergeOrganizations(config, members, dataSource);
+                // Finished updating - now we mark it finished
+                statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
+                statusMessage = "Network: " + firstNetwork.idName + " has " + numUpdated + " members";
+                canStartJob = await canStartMergeJob(config, config.JOBNAME, MERGEJOB_FINISHED, statusMessage);
 
-            // Finished updating - now we mark it finished
-            statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
+            } else {
+                if (DISPLAYLOG) console.error("splitNetwork2organizations: we are in a shit of trouble");
+                debugger;
+            }
 
-
-        } else {
-            console.error("splitNetwork2organizations: we are in a shit of trouble");
-            debugger;
+        } else { // cant start the job
+            //returnMessage = "job already running OR a job is using a resource that cannot run in paralell"
+            // here we could write a status to the job - but no point
         }
-
-
-
-
-
-
-
-
     } else {
-        console.log("splitNetwork2organizations: No ready member lists");
+        if (DISPLAYLOG) console.log("splitNetwork2organizations: No ready member lists");
         moreReadyNetworks = false; // we now know thatthere are no more ready networks to split
     }
-
 
     return moreReadyNetworks;
 
@@ -677,7 +729,7 @@ export function useEmailAsDomain(email) {
                 returnDomainname = tmpUrl.hostname; // if we can get a domain from it - then we return it
             }
             catch (e) { // the web address is not valid
-                console.log("Invalid email :" + email);
+                if (DISPLAYLOG) console.log("Invalid email :" + email);
             }
 
         }
@@ -716,7 +768,7 @@ export function domainFromWeb(web) {
             }
         }
         catch (e) { // the web address is not valid
-            console.log("Invalid web:" + web);
+            if (DISPLAYLOG) console.log("Invalid web:" + web);
         }
 
     }
@@ -954,226 +1006,6 @@ async function getJobFacebookArray(job) {
 
 
 
-/** maestro
- 
-TODO: doc is wrong - udate it!
-maestro is the one that start jobs 
-all other jobs must give control back to maestro when they finish
-
-The jobs have these statuses
-
-idName - ScrapeIdName - Status - Job - JobStatus - Source
-
-
-1. Import of organizations
-What: the jobs like "avfallnorge-no-members" are the ones that scrape member lists. 
-Start: whenever
-Output: One scraperecord that has a list of members
-Stop: ScrapeIdName=members and Status=Ready / Job=maestro JobStatus=Ready
-
-2. members2organization
-What: splits the scrapedmember lists into separate organizations. One scraperecord pr member
-Start: ScrapeIdName=members and Status=Ready
-Output: one scraperecord pr member
-Stop: 
-- for the newly created scraperecord: ScrapeIdName=organization and Status=Ready / Job=maestro JobStatus=Ready
-- for the scraperecord containing the list of members: ScrapeIdName=members and Status=Finished
-
-0. maestroPrepareWebpageInfo
-What: put all organizations that a) has webpage field into scraping queue for webpage-info and
-b) webpage is not already scraped
-Start: every time maestro runs
-Output: opdates Job and JobStatus
-Stop: Job=webpage-info JobStatus=Ready
-
-3. webpage-info
-What: scrapes all web pages ready to be scraped
-Start: Job=webpage-info JobStatus=Ready
-Output: updates every scraperecord with webpage info 
-Stop: Job=maestro JobStatus=Ready
-
-0. maestro.prepareFacebookInfo
-What: put all organizations that a) has facebook field into scraping queue for facebook-info and
-b) facebook is not already scraped
-Start: every time maestro runs
-Output: opdates Job and JobStatus
-Stop: Job=facebook-info JobStatus=Ready
-
-4. facebook-info
-What: scrapes all facebook pages ready to be scraped
-Start: Job=facebook-info JobStatus=Ready
-Output: updates every scraperecord with facebook info 
-Stop: Job=maestro JobStatus=Ready
-
-0. maestro.prepareTwitterInfo
-What: put all organizations that a) has twitter field into scraping queue for twitter-info and
-b) twitter is not already scraped
-Start: every time maestro runs
-Output: opdates Job and JobStatus
-Stop: Job=twitter-info JobStatus=Ready
-
-
-4. twitter-info
-What: scrapes all twitter pages ready to be scraped
-Start: Job=twitter-info JobStatus=Ready
-Output: updates every scraperecord with twitter info 
-Stop: Job=maestro JobStatus=Ready
-
-0. maestro.prepareBrregInfo
-What: put all organizations that a) has organizationnumber field into scraping queue for twitter-info and
-b) twitter is not already scraped
-Start: every time maestro runs
-Output: opdates Job and JobStatus
-Stop: Job=twitter-info JobStatus=Ready
-
-5. brreg-info
-What: scrapes all twitter pages ready to be scraped
-Start: Job=twitter-info JobStatus=Ready
-Output: updates every scraperecord with twitter info 
-Stop: Job=maestro JobStatus=Ready
-
-
-
-
-
-
-
- */
-export async function maestro(config) {
-
-
-    const jobList = [
-        {
-            jobId: "FromInsightly",
-            previousJobName: "insightly_organizations2merge",
-            getJobStatus: "Ready",
-            nextJobName: "webpage_info",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-
-        },
-        {
-            jobId: "SplitScrapedNetworks",
-            previousJobName: "split_network2organizations",
-            getJobStatus: "Finished",
-            nextJobName: "webpage_info",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-
-        },
-        {
-            jobId: "brreg",
-            previousJobName: "webpage_info",
-            getJobStatus: "Finished",
-            nextJobName: "brreg_orgnum2merge,brreg_web2merge", //brreg-name
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-        },
-        {
-            jobId: "brreg_orgnum2merge_automatic", //after sucessful lookup using orgnum send it to merge_automatic
-            previousJobName: "brreg_orgnum2merge",
-            getJobStatus: "Finished",
-            nextJobName: "merge_automatic",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-
-        },
-        {
-            jobId: "brreg_web2merge_automatic", //after sucessful lookup using web send it to merge_automatic
-            previousJobName: "brreg_web2merge",
-            getJobStatus: "Finished",
-            nextJobName: "merge_automatic",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-
-        },
-        {
-            jobId: "brreg_web2merge_automatic-err", //after error lookup using web send it to merge_automatic
-            previousJobName: "brreg_web2merge",
-            getJobStatus: "Error",
-            nextJobName: "merge_automatic",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-        },
-
-
-        {
-            jobId: "UpdateORcreateInsightly",
-            previousJobName: "merge_automatic",
-            getJobStatus: "Finished",
-            nextJobName: "merge_organizations2insightly_update,merge_organizations2insightly_create",
-            setJobStatus: "Ready",
-            nextJobStartUrl: "https://jalla.com"
-
-        },
-    ];
-
-
-    let jobs2processArray = [];
-    let totQued = 0;
-
-    for (let i = 0; i < jobList.length; i++) { // loop the list of job types
-
-        jobs2processArray = await getMergesByJobANDjobStatus(config, jobList[i].previousJobName, jobList[i].getJobStatus);
-
-        for (let readyJob = 0; readyJob < jobs2processArray.length; readyJob++) { //loop the ready jobs
-
-
-
-            switch (jobList[i].jobId) {
-
-                case "brreg":
-
-                    // special handling of jobId=brreg. Depending on wether we have organizationNumber or not
-                    if (jobs2processArray[readyJob].organizationNumber) { // if we have a org num
-                        let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "brreg_orgnum2merge", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
-                        console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-orgnum");
-                        totQued++;
-                    } else { //there is no orgnum - we will try using web 
-                        let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "brreg_web2merge", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
-                        console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "brreg-web");
-                        totQued++;
-                    }
-                    break;
-
-                case "UpdateORcreateInsightly":
-                    if (jobs2processArray[readyJob].sbn_insightly) { // if we have a sbn_insightly - it means that the org exixs in insingtly
-                        let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "merge_organizations2insightly_update", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
-                        console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "merge_organizations2insightly_update");
-                        totQued++;
-                    } else { //there is no sbn_insightly - we will create BUT only if the org is member of a network that we keep in insightly
-                        //TODO: check if member of a network we keep in insghtly
-                        let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, "merge_organizations2insightly_create", jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
-                        console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + "merge_organizations2insightly_create");
-                        totQued++;
-                    }
-                    break;
-
-
-                default:
-                    // No special handling 
-                    let setJobResult = await setJobStatus(config, jobs2processArray[readyJob].id, jobList[i].nextJobName, jobList[i].setJobStatus, jobs2processArray[readyJob].jobLog);
-                    console.log("maestro: (" + readyJob + ") idName:" + jobs2processArray[readyJob].idName + " previousJobName:" + jobList[i].previousJobName + " ==> " + jobList[i].nextJobName)
-                    totQued++;
-
-
-            }
-
-
-
-        }
-        if (jobs2processArray.length > 0) { // if there was stuff to be processed - then
-            console.log("maestro: starting  nextJobName:" + jobList[i].nextJobName); //send signal to start the nextJob
-        }
-
-
-
-    }
-
-
-    return "Total queued is: " + totQued;
-
-}
 
 
 /** findFirstAttribute
@@ -1437,7 +1269,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                         mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
                         mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
                     } else { // brreg has sent us shit again
-                        console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
+                        if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
                         mergeRecord.urbalurbaError = "Error search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + "= Not equal!";
                         debugger;
                     }
@@ -1451,7 +1283,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                     } else {// there are none
                         // the search is sending bullshit back to us
                         // not sure what to do 
-                        console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!");
+                        if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!");
                         mergeRecord.urbalurbaError = "Error Search for hjemmeside=" + searchHjemmeside + " is returning:" + totalElements + " .NONE of them has correct hjemmeside !!";
                         debugger;
                     }
@@ -1466,7 +1298,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                     mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
                     mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
                 } else { // brreg has set us shit again
-                    console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
+                    if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + " Not equal!");
                     mergeRecord.urbalurbaError = "Error search for hjemmeside=" + searchHjemmeside + " is returning hjemmeisde=" + brregRecord._embedded.enheter[0].hjemmeside + "= Not equal!";
                     debugger;
                 }
@@ -1502,7 +1334,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                         mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
                         mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
                     } else { // brreg has sent us shit again
-                        console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
+                        if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
                         mergeRecord.urbalurbaError = "Error search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + "= Not equal!";
                         debugger;
                     }
@@ -1516,7 +1348,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                     } else {// there are none
                         // the search is sending bullshit back to us
                         // not sure what to do 
-                        console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning:" + totalElements + " .NONE of them has correct navn !!");
+                        if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning:" + totalElements + " .NONE of them has correct navn !!");
                         mergeRecord.urbalurbaError = "Error Search for navn=" + searchOrganizationName + "= is returning:" + totalElements + " .NONE of them has correct navn !!";
                         debugger;
                     }
@@ -1533,7 +1365,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
                     mergeRecord.urbalurbaImport = oneBrregOrg; //the imported data is stored in "".import"            
                     mergeRecord.urbalurbaVerified = BRREG_VERIFIED;
                 } else { // brreg has set us shit again
-                    console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
+                    if (DISPLAYLOG) console.error("brreg2mergeRecord: Error. search for navn=" + searchOrganizationName + "= is returning navn=" + brregRecord._embedded.enheter[0].navn + " Not equal!");
                     mergeRecord.urbalurbaError = "Error search for navn=" + searchOrganizationName + "= is returning hjemmeisde=" + brregRecord._embedded.enheter[0].navn + "= Not equal!";
                     debugger;
                 }
@@ -1571,7 +1403,7 @@ export function brreg2mergeRecord(brregRecord, searchHjemmeside, searchOrganizat
             mergeRecord.displayName = tmpResult;
         }
 
-//JALLA delete        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
+        //JALLA delete        mergeRecord.urbalurbaIdName = name2UrbalurbaIdName(mergeRecord.displayName);
 
 
         //copy field: "hjemmeside" --> "web" and add http://
@@ -1873,7 +1705,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
 
 
-        console.log("updateMergeNetworks: (" + netCounter + ") network idName:", idName)
+        if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") network idName:", idName)
 
         let mergeArray = await getMergesByIdNameANDentitytype(config, idName, entitytype);
         if (mergeArray.length == 0) { // there is no previous record
@@ -1896,10 +1728,10 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, config.DATASOURCE);
 
             if (mergeRecord == "none") { // there is was an error
-                console.error("updateMergeNetworks: Error creating network for:" + idName);
+                if (DISPLAYLOG) console.error("updateMergeNetworks: Error creating network for:" + idName);
                 debugger;
             } else {
-                console.log("updateMergeNetworks: Created network for:" + idName);
+                if (DISPLAYLOG) console.log("updateMergeNetworks: Created network for:" + idName);
 
             }
 
@@ -1907,7 +1739,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
         } else { // there is a previous merge record - we will update it
 
-            console.log("updateMergeNetworks: idName:" + idName + " already has entitytype=" + entitytype);
+            if (DISPLAYLOG) console.log("updateMergeNetworks: idName:" + idName + " already has entitytype=" + entitytype);
 
 
 
@@ -1958,10 +1790,10 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, config.DATASOURCE);
 
             if (updateMergeRecordResult == "none") { // there is was an error
-                console.error("updateMergeNetworks: Error updating network for:" + idName);
+                if (DISPLAYLOG) console.error("updateMergeNetworks: Error updating network for:" + idName);
                 debugger;
             } else {
-                console.log("updateMergeNetworks: Updated network for:" + idName);
+                if (DISPLAYLOG) console.log("updateMergeNetworks: Updated network for:" + idName);
             }
 
 
@@ -1969,7 +1801,7 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
 
     }
-    console.log("updateNetworks finished. Processed total :", netCounter);
+    if (DISPLAYLOG) console.log("updateNetworks finished. Processed total :", netCounter);
     return netCounter;
 };
 
@@ -2055,7 +1887,7 @@ function strapi2mergeRecord(strapiRecord) {
     delete strapiRecord.tags;
 
 
-//JALLA delete    strapiRecord.urbalurbaIdName = name2UrbalurbaIdName(strapiRecord.displayName);
+    //JALLA delete    strapiRecord.urbalurbaIdName = name2UrbalurbaIdName(strapiRecord.displayName);
 
     return strapiRecord;
 
@@ -2115,7 +1947,7 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 newData = member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, mergeOrganizationsArray[orgCounter], newData);
 
                 // get all the top level ID's 
-                
+
                 //-- urbalurbaIdName is not defined when there is a new record -- unless we are importing from strapi or insightly
                 let urbalurbaIdName = mergeOrganizationsArray[orgCounter].urbalurbaIdName;
 
@@ -2127,16 +1959,16 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
                 let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
                 if (createResult == "none") { // there is was an error
-                    console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Error creating");
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Error creating");
                     numError++;
                 } else {
-                    console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Created");
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Created");
                     numCreated++;
                 }
 
 
             } else { // there is an existing org here
-                console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
+                if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
 
 
                 // split the information about a member into two parts. One "source" part and one "membership" part
@@ -2184,17 +2016,17 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
                 let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog, dataSource);
                 if (updateResult == "none") { // there is was an error
-                    console.error("updateMergeOrganizations: Error cannot update idName=" + idName);
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: Error cannot update idName=" + idName);
                     numError++;
                 } else {
-                    console.log("updateMergeOrganizations: Updated idName=" + idName);
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: Updated idName=" + idName);
                     numUpdated++;
                 }
 
             }
 
         } else {
-            console.log("splitNetwork2organizations: (" + orgCounter + ")No idName:" + mergeOrganizationsArray[orgCounter].displayName + " skipping");
+            if (DISPLAYLOG) console.error("splitNetwork2organizations: (" + orgCounter + ")No idName:" + mergeOrganizationsArray[orgCounter].displayName + " skipping");
             debugger;
         }
 
@@ -2419,7 +2251,7 @@ function findAllNetworkmemberships(memberships) {
             }
 
         } else { // There was no networks
-            console.log("findAllNetworkmemberships: membFieldName:" + membFieldName + " has no networkmembership!")
+            if (DISPLAYLOG) console.log("findAllNetworkmemberships: membFieldName:" + membFieldName + " has no networkmembership!")
         }
 
     } // end looping the array of info: attributes
@@ -2461,7 +2293,7 @@ export function generateNewMasterRecord(currentData) {
 
     if (currentData.hasOwnProperty("members")) {
         newMasterRecord = "none";
-        console.log("generateNewMasterRecord: missig code for merging members to masterRecord");
+        //console.log("generateNewMasterRecord: missig code for merging members to masterRecord");
     } else { // it is a organization - lets merge it
 
 
@@ -2504,7 +2336,7 @@ export function generateNewMasterRecord(currentData) {
                     Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
 
                         //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
-                        
+
                         fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, key, parentFieldname, currentData);
                         if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
                             if (fieldNameValue != undefined) { // only store a value if there is a value to store
@@ -2532,8 +2364,8 @@ export function generateNewMasterRecord(currentData) {
 
 
                     } else { // not object and not array - just copy the key and value
-                       
-                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority,fieldName, null, currentData);
+
+                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, fieldName, null, currentData);
                         // we can get a object or just a string here. 
                         //This means that it can also be an empty object or string - and that we do not want to store
 
@@ -2569,20 +2401,250 @@ export function generateNewMasterRecord(currentData) {
         } // end looping trugh all fields in a MERGERECORD
 
 
+        //the domains field is not there if the organization is scraped 
+        //TODO: here we must have a function findAllDomains
+        let tmpDomainArray = getNested(newOrganizationMasterRecord, "domains"); 
+        if (!tmpDomainArray) { // no domains array
+            let tmpDomain = getNested(newOrganizationMasterRecord, "domain"); 
+            if ((tmpDomain != undefined) && (tmpDomain != null)) { // there is a domain
+                newOrganizationMasterRecord.domains = [];
+                newOrganizationMasterRecord.domains.push(tmpDomain); //put the 
+            }
+        }
 
-        // console.log("masterRecord merged record is: ", JSON.stringify(newOrganizationMasterRecord, null, 2));
+        
 
         // then we need to look at the netwok membership
-
         newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
 
         // then- before we write the update we need to put the parameters right
         newMasterRecord.organization = newOrganizationMasterRecord;
         newMasterRecord.networkmemberships = newNetworkmemberships
         newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+
     }
 
     return newMasterRecord;
 
 
 }
+
+
+
+/** canStartMergeJob
+ If a jobName exists the status is updated. If it does not exist it is created 
+ returns true if 
+ */
+export async function canStartMergeJob(config, jobName, newStatus, statusMessage) {
+
+    let canStartJob = false;
+    let resourceBlocked = await isMergeJobTypeBlocked(config); // check if the job is using resources that cannot run in paralell
+
+    if (!resourceBlocked || newStatus == MERGEJOB_FINISHED) { // if it is a signal to stop it wedont care about the resourceBlocked
+
+        let mergeJob = await getMergeJobStatus(config, jobName);
+        if (mergeJob != "none") { // if there a status there
+            if (mergeJob.jobStatus == MERGEJOB_RUNNING) { // process is already running
+                if (newStatus == MERGEJOB_FINISHED) { // the job is finished - we need to mark it finished
+
+                    let updateResult = await updateMergeJobStatus(config, jobName, newStatus, mergeJob.id, mergeJob.jobLog, statusMessage);
+                    canStartJob = true; // indicating that we could stop it
+                } else { // the job is running and we must not start it again
+                    canStartJob = false;
+                    // do nothing
+                }
+
+            } else { // job is not running - we can start it
+                let updateResult = await updateMergeJobStatus(config, jobName, newStatus, mergeJob.id, mergeJob.jobLog, statusMessage);
+                canStartJob = true;
+            }
+
+        } else { // there is no status there
+
+            let createResult = await createMergeJobStatus(config, jobName, newStatus, statusMessage)
+            canStartJob = true;
+
+        }
+    }
+
+    return canStartJob;
+}
+
+/** getMergeJobStatus
+ Returns the mergeJob record if the jobName exists.
+ returns "none" if it does not exist. 
+ */
+async function getMergeJobStatus(config, jobName) {
+
+    let strapiRequestURL = config.STRAPIURI + MERGEJOB_DATASET + "?jobName=" + jobName;
+    let data = "none"
+    let result;
+
+    try {
+        result = await axios.get(strapiRequestURL, {
+            headers: {
+                Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 getMergeJobStatus catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    if (data.length == 0) {
+        data = "none"; // no results
+    } else {
+        data = data[0]; // the first entry
+    }
+    return data;
+
+}
+
+/** updateMergeJobStatus
+ Updates the status on a job
+ */
+async function updateMergeJobStatus(config, jobName, jobStatus, mergeJobID, jobLog, statusMessage) {
+
+
+    let strapiRequestURL = config.STRAPIURI + MERGEJOB_DATASET + "/" + mergeJobID;
+
+    jobLog = addJobLog(jobName, statusMessage, jobStatus, jobLog);
+
+    let mergeJob = {
+        jobName: jobName,
+        statusTime: new Date().toISOString(),
+        jobName: jobName,
+        jobLog: jobLog,
+        jobStatus: jobStatus,
+        blockJobType: config.BLOCKJOBTYPE
+    };
+
+    let data = "none";
+    let result;
+
+    try {
+
+        result = await axios(
+            {
+                url: strapiRequestURL,
+                method: 'put',
+                headers: {
+                    Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify(mergeJob)
+            }
+        );
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 updateMergeJobStatus catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    return data;
+
+}
+
+
+/** createMergeJobStatus
+ 
+ */
+async function createMergeJobStatus(config, jobName, jobStatus, statusMessage) {
+
+    let strapiRequestURL = config.STRAPIURI + MERGEJOB_DATASET;
+
+    let jobLog = null;
+    jobLog = addJobLog(jobName, statusMessage, jobStatus, jobLog);
+
+    let mergeJob = {
+        jobName: jobName,
+        statusTime: new Date().toISOString(),
+        jobLog: jobLog,
+        jobStatus: jobStatus,
+        blockJobType: config.BLOCKJOBTYPE
+    };
+
+    let data = "none";
+    let result;
+
+    try {
+
+        result = await axios(
+            {
+                url: strapiRequestURL,
+                method: 'post',
+                headers: {
+                    Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify(mergeJob)
+            }
+        );
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 createMergeJobStatus catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    return data;
+
+
+}
+
+
+/** isMergeJobTypeBlocked
+ Some jobs use resources that cannot be used in paralell.
+ Eg Apify that creates a directory named apify_storage 
+ returns false if there is no blocking job and true it there is.
+The field blockJobType is used to indicate that the job requires blocking.
+
+ */
+async function isMergeJobTypeBlocked(config) {
+
+    let runningInParalell = false;
+
+    if (config.BLOCKJOBTYPE) { // only do test if the job is using a resource that cannot run in paralell
+
+
+        let strapiRequestURL = config.STRAPIURI + MERGEJOB_DATASET + "?blockJobType=" + config.BLOCKJOBTYPE + "&jobStatus=" + MERGEJOB_RUNNING;
+        let data = "none"
+        let result;
+
+        try {
+            result = await axios.get(strapiRequestURL, {
+                headers: {
+                    Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            data = result.data;
+
+        }
+        catch (e) {
+            let logTxt = "1.9 isMergeJobTypeBlocked catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+            console.error(logTxt);
+            debugger
+        }
+
+        if (data.length > 0) {
+            runningInParalell = true;
+        }
+
+
+    }
+
+    return runningInParalell;
+
+}
+
