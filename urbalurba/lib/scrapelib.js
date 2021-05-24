@@ -413,7 +413,7 @@ The attribute looks like this:
     }
 } 
  */
-function addJobLog(jobName, dataSource, jobStatus, jobLogField) {
+function addJobLog(jobName, dataSource, jobStatus, jobLogField, logMessage) {
 
     if (!jobLogField) { // first time
         jobLogField = {
@@ -426,7 +426,8 @@ function addJobLog(jobName, dataSource, jobStatus, jobLogField) {
         date: new Date().toISOString(),
         jobName: jobName,
         dataSource: dataSource,
-        jobStatus: jobStatus
+        jobStatus: jobStatus,
+        logMessage: logMessage
     }
 
     return jobLogField;
@@ -437,12 +438,12 @@ function addJobLog(jobName, dataSource, jobStatus, jobLogField) {
 /** setJobStatus
  set the jobStatus for a jobName
  */
-export async function setJobStatus(config, mergeID, jobName, jobStatus, jobLog) {
+export async function setJobStatus(config, mergeID, jobName, jobStatus, jobLog, errorMessage) {
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "/" + mergeID;
 
 
-    jobLog = addJobLog(jobName, config.DATASOURCE, jobStatus, jobLog);
+    jobLog = addJobLog(jobName, config.DATASOURCE, jobStatus, jobLog, errorMessage);
 
 
     //config values
