@@ -1,7 +1,7 @@
 /* functions for 
 - communication with strapi backend
 - converting+++
-7may21
+25may
 */
 
 
@@ -20,6 +20,9 @@ import {
     prefixArrayObjects
 } from "./strapidatalib.js";
 
+import { 
+    logger
+} from "./logger.js";
 
 export const DISPLAYLOG = true;
 
@@ -533,10 +536,14 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
 
         if (mergeRecord == "none") { // there is was an error
-            if (DISPLAYLOG) console.error("pushData: Error creating scraping for:" + idName);
+            let errorMessage =  "Error creating merge";
+            if (DISPLAYLOG) console.log("pushData: idName:" + idName + " -> " + errorMessage);
+            logger.error(errorMessage, { "idName": idName ,"jobName": config.JOBNAME });        
             returnResult = "Error"
-        } else {
-            if (DISPLAYLOG) console.log("pushData: Created scraping for:" + idName);
+        } else {                        
+            if (DISPLAYLOG) console.log("pushData: Created merge for:" + idName);
+            let okMessage = "pushData: Created merge for:" + idName;
+            logger.info(okMessage, { "idName": idName ,"jobName": config.JOBNAME });                        
             returnResult = "OK"
         }
     } else { // there is a previous merge record - we will update it
@@ -595,10 +602,14 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
         let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, dataSource);
 
         if (updateMergeRecordResult == "none") { // there is was an error
-            if (DISPLAYLOG) console.error("pushData: Error updating scraping for:" + idName);
+            let errorMessage =  "pushData: Error updating merge";
+            if (DISPLAYLOG) console.error("pushData: Error updating merge for:" + idName);
+            logger.error(errorMessage, { "idName": idName ,"jobName": config.JOBNAME });        
             returnResult = "Error"
         } else {
-            if (DISPLAYLOG) console.log("pushData: Updated scraping for:" + idName);
+            let okMessage = "pushData: Updated merge";
+            if (DISPLAYLOG) console.log("pushData: Updated merge for:" + idName);
+            logger.info(okMessage, { "idName": idName ,"jobName": config.JOBNAME });                                    
             returnResult = "OK"
         }
     }
@@ -668,9 +679,13 @@ export async function splitNetwork2organizations(config) {
                 statusResult = await setJobStatus(config, firstNetwork.id, firstNetwork.jobName, "Finished", firstNetwork.jobLog);
                 statusMessage = "Network: " + firstNetwork.idName + " has " + numUpdated + " members";
                 canStartJob = await canStartMergeJob(config, config.JOBNAME, MERGEJOB_FINISHED, statusMessage);
+                let okMessage = "Network updated. Status=" + statusResult;
+                logger.info(okMessage, { "networkIdName": firstNetwork.idName , "updatedMembers": numUpdated,"jobName": config.JOBNAME });                        
 
             } else {
-                if (DISPLAYLOG) console.error("splitNetwork2organizations: we are in a shit of trouble");
+                let errorMessage =  "We are in a shit of trouble";                
+                if (DISPLAYLOG) console.error("splitNetwork2organizations:" + " -> " + errorMessage);
+                logger.error(errorMessage, { "networkIdName": firstNetwork.idName , "jobName": config.JOBNAME });        
                 debugger;
             }
 
@@ -915,7 +930,8 @@ export async function getJobArray_web(config, jobName) {
                 userData: {
                     domain: mergeRecord.idName,
                     id: mergeRecord.id,
-                    jobLog: mergeRecord.jobLog
+                    jobLog: mergeRecord.jobLog,
+                    displayName: mergeRecord.displayName
                 }
             };
             returnJobArray.push(webObject);
@@ -1703,9 +1719,6 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
         let idName = currentMergeNetworkRecord.idName;
 
 
-
-
-
         if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") network idName:", idName)
 
         let mergeArray = await getMergesByIdNameANDentitytype(config, idName, entitytype);
@@ -1729,11 +1742,14 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, config.DATASOURCE);
 
             if (mergeRecord == "none") { // there is was an error
-                if (DISPLAYLOG) console.error("updateMergeNetworks: Error creating network for:" + idName);
+                let errorMessage = "Error creating network";
+                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);                    
+                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });                
                 debugger;
             } else {
-                if (DISPLAYLOG) console.log("updateMergeNetworks: Created network for:" + idName);
-
+                let okMessage =  "Success creating network "
+                if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
+                logger.info(okMessage, { "networkIdName": idName , "jobName": config.JOBNAME });
             }
 
 
@@ -1741,8 +1757,6 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
         } else { // there is a previous merge record - we will update it
 
             if (DISPLAYLOG) console.log("updateMergeNetworks: idName:" + idName + " already has entitytype=" + entitytype);
-
-
 
 
             let existingData = mergeArray[0].data; // there should be only one - pick the first one                    
@@ -1761,13 +1775,11 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             }
 
 
-
             if (mergeArray[0].organizationNumber) { // we have a organizationNumber
                 organizationNumber = mergeArray[0].organizationNumber; // keep the initial
             } else { // we take whatever is here
                 organizationNumber = currentMergeNetworkRecord.organizationNumber;
             }
-
 
 
             if (mergeArray[0].sbn_insightly) { // we have a insightly ID
@@ -1791,10 +1803,15 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
             let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, config.DATASOURCE);
 
             if (updateMergeRecordResult == "none") { // there is was an error
-                if (DISPLAYLOG) console.error("updateMergeNetworks: Error updating network for:" + idName);
+                let errorMessage = "Error updating network";
+                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);                    
+                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });                
                 debugger;
+
             } else {
-                if (DISPLAYLOG) console.log("updateMergeNetworks: Updated network for:" + idName);
+                let okMessage =  "Success updating network "
+                if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
+                logger.info(okMessage, { "networkIdName": idName , "jobName": config.JOBNAME });                
             }
 
 
@@ -1960,10 +1977,14 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
                 let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
                 if (createResult == "none") { // there is was an error
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Error creating");
+                    let errorMessage = "Error creating merge";
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);                    
+                    logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
-                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " Created");
+                    let okMessage =  "Success creating merge "
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
+                    logger.info(okMessage, { "idName": idName , "jobName": config.JOBNAME });
                     numCreated++;
                 }
 
@@ -2017,17 +2038,23 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
                 let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog, dataSource);
                 if (updateResult == "none") { // there is was an error
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: Error cannot update idName=" + idName);
+                    let errorMessage = "Error cannot update merge";
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);                    
+                    logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
-                    if (DISPLAYLOG) console.log("updateMergeOrganizations: Updated idName=" + idName);
+                    let okMessage =  "Success updatig merge "
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
+                    logger.info(okMessage, { "idName": idName , "jobName": config.JOBNAME });                    
                     numUpdated++;
                 }
 
             }
 
         } else {
-            if (DISPLAYLOG) console.error("splitNetwork2organizations: (" + orgCounter + ")No idName:" + mergeOrganizationsArray[orgCounter].displayName + " skipping");
+            let warningMessage = "Skipping. No idName for displayName=" + mergeOrganizationsArray[orgCounter].displayName;
+            if (DISPLAYLOG) console.error("splitNetwork2organizations: (" + orgCounter + ") " + warningMessage);
+            logger.warn(warningMessage, { "displayName": mergeOrganizationsArray[orgCounter].displayName , "jobName": config.JOBNAME });
             debugger;
         }
 

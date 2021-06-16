@@ -87,7 +87,7 @@ export async function getFylkeByKommunenummer(kommunenummer) {
 
     }
     catch (e) {
-        console.error("1.9 getLocationDataByPostAddress catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(response));
+        console.error("1.9 getFylkeByKommunenummer catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(response));
         debugger
     }
 
