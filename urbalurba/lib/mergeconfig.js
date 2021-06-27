@@ -8,6 +8,10 @@ export const MERGECONFIG = {
             "geonorge",
             "webpage_"
         ],
+        "adminLocation": [
+            "strapi",
+            "geonorge" // this is the place to get the data - strapi is just there in case overriding
+        ],
         "summary": [
             "strapi",
             "insightly",            

@@ -54,6 +54,8 @@ const INSIGHTLY_CONTACTSBYTAGURI = "https://api.insightly.com/v3.1/Contacts/Sear
 
 const INSIGHTLY_ORGANIZATION_URL = "https://api.insightly.com/v3.1/Organisations";
 const INSIGHTLY_ORGANIZATION_DOMAIN_SEARCH_URL = "https://api.insightly.com/v3.1/Organisations/Search?field_name=EMAIL_DOMAIN&brief=false&count_total=false&field_value="
+const INSIGHTLY_ORGANIZATION_ORGANISATION_NAME_SEARCH_URL = "https://api.insightly.com/v3.1/Organisations/Search?field_name=ORGANISATION_NAME&brief=false&count_total=false&field_value="
+
 
 const INSIGHTLY_ORGANIZATION_TAGS_URI = "https://api.insightly.com/v3.1/Organisations/:ORGANISATION_ID/Tags";
 
@@ -1981,7 +1983,7 @@ export async function getInsightlyOrganization(organisation_id) {
  *
  */
 
-function getInsightlyCustomField(fieldName, orgRecord) {
+export function getInsightlyCustomField(fieldName, orgRecord) {
 
     fieldName = fieldName + "__c"; // custom field has a __c ending
     if (orgRecord.hasOwnProperty("CUSTOMFIELDS")) { //if there are costom fields here
@@ -2214,7 +2216,7 @@ function hasInsightlyTag(tagName, tagArray) {
  *
  */
 
-function setInsightlyCustomField(customFieldName, customFieldValue, insightlyRecord) {
+export function setInsightlyCustomField(customFieldName, customFieldValue, insightlyRecord) {
 
     const CUSTOM_FIELD_ENDING = "__c";
     let createNewCustomField = true;
@@ -2440,7 +2442,7 @@ export async function copyInsightlyCategoryAnswers(entityID, entityIdName, insig
  * @param {*} insightlyRecord 
  */
 
-function insightlyGetEmailDomains(insightlyRecord) {
+export function insightlyGetEmailDomains(insightlyRecord) {
     let domainsArray = [];
 
     if (insightlyRecord.hasOwnProperty("EMAILDOMAINS")) {
@@ -2983,6 +2985,37 @@ export async function getAllInsightlyOrganizationsByIdName(idName) {
 
 };
 
+/** getAllInsightlyOrganizationsByOrganizationName
+ * reads all organizations in insightly that has the organization name
+ * remember that when searching for "123" you wil get "123" and "1234"
+ there might be more than one record.
+ */
+ export async function getAllInsightlyOrganizationsByOrganizationName(organizationName) {
+
+    let organizationNameCoded = encodeURIComponent(organizationName); // encode it correctly
+    let insightlyRequestURL = INSIGHTLY_ORGANIZATION_ORGANISATION_NAME_SEARCH_URL + organizationNameCoded;
+    let data;
+    let result;
+
+    try {
+        result = await axios.get(insightlyRequestURL, {
+            auth: {
+                username: INSIGHTLY_APIKEY
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        console.error("1.9 getAllInsightlyOrganizationsByOrganizationName catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(result));
+        data = "none";
+        debugger
+    }
+
+    return data;
+
+};
+
 /** getAllInsightlyOrganizationsByDomainName
  * reads all organizations in insightly that has the domain name
  there might be more than one record.
@@ -3005,6 +3038,7 @@ export async function getAllInsightlyOrganizationsByIdName(idName) {
     }
     catch (e) {
         console.error("1.9 getAllInsightlyOrganizationsByDomainName catch error :", JSON.stringify(e), " =>result is:", JSON.stringify(result));
+        data = "none";
         debugger
     }
 
@@ -4135,17 +4169,19 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
                 setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", tmpResult, updatedInsightlyRecord);
             }
 
-            //fylke is  countyName
+/* DELETE old stuff    
+        //fylke is  countyName
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("fylke", tmpResult, updatedInsightlyRecord);
             }
-
+ 
             //kommunenr is  countyName
             tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("kommunenr", tmpResult, updatedInsightlyRecord);
             }
+*/
 
             //Organisasjonsnummer is organizationNumber 
             tmpResult = getNested(mergeRecord, "organization", "organizationNumber");

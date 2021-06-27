@@ -8,19 +8,24 @@
 
 import axios from 'axios';
 import { MERGECONFIG } from "./mergeconfig.js";
-import { 
-    getNested, 
-    name2UrbalurbaIdName, 
-    string2IdKey, 
+import {
+    getNested,
+    name2UrbalurbaIdName,
+    string2IdKey,
     companyName2displayName,
-     
+
 } from "./urbalurbalib2.js";
 
-import { 
+import {
     prefixArrayObjects
 } from "./strapidatalib.js";
 
-import { 
+
+import {
+    insightly2mergeRecord
+} from "./insightlylib.js";
+
+import {
     logger
 } from "./logger.js";
 
@@ -195,7 +200,7 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
     if (newMasterRecord) { // if there is a master record -then we must get the domains and networkmemberships
 
         // get the domains - if any
-        tmpResultArray = getNested(newMasterRecord, "organization","domains");
+        tmpResultArray = getNested(newMasterRecord, "organization", "domains");
         if ((tmpResultArray != undefined) && (tmpResultArray != null)) { // there is a domains 
             mergeRecord.domains = prefixArrayObjects(tmpResultArray, "domainName");
         }
@@ -360,7 +365,7 @@ async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, 
     if (newMasterRecord) { // if there is a master record -then we must get the domains and networkmemberships
 
         // get the domains - if any
-        tmpResultArray = getNested(newMasterRecord, "organization","domains");
+        tmpResultArray = getNested(newMasterRecord, "organization", "domains");
         if ((tmpResultArray != undefined) && (tmpResultArray != null)) { // there is a domains 
             mergeRecord.domains = prefixArrayObjects(tmpResultArray, "domainName");
         }
@@ -536,14 +541,14 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
 
 
         if (mergeRecord == "none") { // there is was an error
-            let errorMessage =  "Error creating merge";
+            let errorMessage = "Error creating merge";
             if (DISPLAYLOG) console.log("pushData: idName:" + idName + " -> " + errorMessage);
-            logger.error(errorMessage, { "idName": idName ,"jobName": config.JOBNAME });        
+            logger.error(errorMessage, { "idName": idName, "jobName": config.JOBNAME });
             returnResult = "Error"
-        } else {                        
+        } else {
             if (DISPLAYLOG) console.log("pushData: Created merge for:" + idName);
             let okMessage = "pushData: Created merge for:" + idName;
-            logger.info(okMessage, { "idName": idName ,"jobName": config.JOBNAME });                        
+            logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
             returnResult = "OK"
         }
     } else { // there is a previous merge record - we will update it
@@ -602,14 +607,14 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
         let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, dataSource);
 
         if (updateMergeRecordResult == "none") { // there is was an error
-            let errorMessage =  "pushData: Error updating merge";
+            let errorMessage = "pushData: Error updating merge";
             if (DISPLAYLOG) console.error("pushData: Error updating merge for:" + idName);
-            logger.error(errorMessage, { "idName": idName ,"jobName": config.JOBNAME });        
+            logger.error(errorMessage, { "idName": idName, "jobName": config.JOBNAME });
             returnResult = "Error"
         } else {
             let okMessage = "pushData: Updated merge";
             if (DISPLAYLOG) console.log("pushData: Updated merge for:" + idName);
-            logger.info(okMessage, { "idName": idName ,"jobName": config.JOBNAME });                                    
+            logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
             returnResult = "OK"
         }
     }
@@ -680,12 +685,12 @@ export async function splitNetwork2organizations(config) {
                 statusMessage = "Network: " + firstNetwork.idName + " has " + numUpdated + " members";
                 canStartJob = await canStartMergeJob(config, config.JOBNAME, MERGEJOB_FINISHED, statusMessage);
                 let okMessage = "Network updated. Status=" + statusResult;
-                logger.info(okMessage, { "networkIdName": firstNetwork.idName , "updatedMembers": numUpdated,"jobName": config.JOBNAME });                        
+                logger.info(okMessage, { "networkIdName": firstNetwork.idName, "updatedMembers": numUpdated, "jobName": config.JOBNAME });
 
             } else {
-                let errorMessage =  "We are in a shit of trouble";                
+                let errorMessage = "We are in a shit of trouble";
                 if (DISPLAYLOG) console.error("splitNetwork2organizations:" + " -> " + errorMessage);
-                logger.error(errorMessage, { "networkIdName": firstNetwork.idName , "jobName": config.JOBNAME });        
+                logger.error(errorMessage, { "networkIdName": firstNetwork.idName, "jobName": config.JOBNAME });
                 debugger;
             }
 
@@ -1743,13 +1748,13 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
             if (mergeRecord == "none") { // there is was an error
                 let errorMessage = "Error creating network";
-                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);                    
-                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });                
+                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);
+                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });
                 debugger;
             } else {
-                let okMessage =  "Success creating network "
+                let okMessage = "Success creating network "
                 if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
-                logger.info(okMessage, { "networkIdName": idName , "jobName": config.JOBNAME });
+                logger.info(okMessage, { "networkIdName": idName, "jobName": config.JOBNAME });
             }
 
 
@@ -1804,14 +1809,14 @@ export async function updateMergeNetworks(config, mergeNetworkArray) {
 
             if (updateMergeRecordResult == "none") { // there is was an error
                 let errorMessage = "Error updating network";
-                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);                    
-                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });                
+                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);
+                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });
                 debugger;
 
             } else {
-                let okMessage =  "Success updating network "
+                let okMessage = "Success updating network "
                 if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
-                logger.info(okMessage, { "networkIdName": idName , "jobName": config.JOBNAME });                
+                logger.info(okMessage, { "networkIdName": idName, "jobName": config.JOBNAME });
             }
 
 
@@ -1927,6 +1932,8 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
     const SOURCE = "source";
     const MEMBERSHIPS = "memberships";
 
+    debugger; // must be tested after refactoring out updateMergeOrganization
+
     for (let orgCounter = 0; orgCounter < mergeOrganizationsArray.length; orgCounter++) {
         let idName = mergeOrganizationsArray[orgCounter].idName;
         if (idName) {
@@ -1978,13 +1985,13 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
                 if (createResult == "none") { // there is was an error
                     let errorMessage = "Error creating merge";
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);                    
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);
                     logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
-                    let okMessage =  "Success creating merge "
+                    let okMessage = "Success creating merge "
                     if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
-                    logger.info(okMessage, { "idName": idName , "jobName": config.JOBNAME });
+                    logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
                     numCreated++;
                 }
 
@@ -2039,13 +2046,13 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog, dataSource);
                 if (updateResult == "none") { // there is was an error
                     let errorMessage = "Error cannot update merge";
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);                    
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);
                     logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
-                    let okMessage =  "Success updatig merge "
+                    let okMessage = "Success updatig merge "
                     if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
-                    logger.info(okMessage, { "idName": idName , "jobName": config.JOBNAME });                    
+                    logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
                     numUpdated++;
                 }
 
@@ -2054,7 +2061,7 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
         } else {
             let warningMessage = "Skipping. No idName for displayName=" + mergeOrganizationsArray[orgCounter].displayName;
             if (DISPLAYLOG) console.error("splitNetwork2organizations: (" + orgCounter + ") " + warningMessage);
-            logger.warn(warningMessage, { "displayName": mergeOrganizationsArray[orgCounter].displayName , "jobName": config.JOBNAME });
+            logger.warn(warningMessage, { "displayName": mergeOrganizationsArray[orgCounter].displayName, "jobName": config.JOBNAME });
             debugger;
         }
 
@@ -2062,6 +2069,75 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
     return numUpdated + numCreated;
 
+
+}
+
+/** updateMergeOrganizationRecordWithInsightly
+ Takes the existing existingMergeRecord and the insightlyRecord
+ Returns a full merge record that can be written to merge
+ */
+export function updateMergeOrganizationRecordWithInsightly(existingMergeRecord, insightlyRecord, DATASOURCE, SOURCE, MEMBERSHIPS ) {
+
+    let insightlyMergeRecord = insightly2mergeRecord(insightlyRecord); // first create a mergeRecord that holds the insightly info
+    // split the information about a member into two parts. One "source" part and one "membership" part
+    let existingMergeData = existingMergeRecord.data;
+
+    let updatedMergeData = member2mergeRecord(DATASOURCE, SOURCE, MEMBERSHIPS, insightlyMergeRecord, existingMergeData);
+
+    // get all the top level ID's
+    let urbalurbaIdName = "";
+    if (existingMergeRecord.urbalurbaIdName) { //if there is a urbalurbaIdName
+        urbalurbaIdName = existingMergeRecord.urbalurbaIdName; //keep the initial 
+    } else {
+        urbalurbaIdName = insightlyMergeRecord.urbalurbaIdName; //if not take the one from the new data
+    }
+
+    let organizationNumber = "";
+    if (existingMergeRecord.organizationNumber) { // we have a organizationNumber
+        organizationNumber = existingMergeRecord.organizationNumber; // keep the initial
+    } else { // we take whatever is here
+        organizationNumber = insightlyMergeRecord.organizationNumber;
+    }
+
+    let sbn_insightly = "";
+    if (existingMergeRecord.sbn_insightly) { // we have a insightly ID
+        sbn_insightly = existingMergeRecord.sbn_insightly; // keep the initial
+    } else { // we take whatever is here
+        sbn_insightly = insightlyMergeRecord.sbn_insightly;
+    }
+
+    let domain = "";
+    if (existingMergeRecord.domain) { // we have a domain
+        domain = existingMergeRecord.domain; // keep the initial
+    } else { // we take whatever is here
+        domain = insightlyMergeRecord.domain;
+    }
+
+    let web = "";
+    if (existingMergeRecord.web) { // we have a domain
+        web = existingMergeRecord.web; // keep the initial
+    } else { // we take whatever is here
+        web = insightlyMergeRecord.web;
+    }
+    web = addWebProtocol(web);
+
+    let idName = "";
+    if (existingMergeRecord.idName) { // we have a idname
+        idName = existingMergeRecord.idName; // keep the initial
+    } else { // we take whatever is here
+        idName = insightlyMergeRecord.idName;
+    }
+
+    // now build the updatedMergeRecord that will be returned
+    let updatedMergeRecord = existingMergeRecord;
+    updatedMergeRecord.urbalurbaIdName = urbalurbaIdName;    
+    updatedMergeRecord.organizationNumber = organizationNumber;
+    updatedMergeRecord.sbn_insightly = sbn_insightly;
+    updatedMergeRecord.domain = domain;
+    updatedMergeRecord.web = web;
+    updatedMergeRecord.idName = idName;
+
+    return updatedMergeRecord;
 
 }
 
@@ -2292,6 +2368,48 @@ function findAllNetworkmemberships(memberships) {
 
 }
 
+/** findAllDomains
+ takes the data.source as parameter. For each property we look for the fields "domain" and "domains"
+ This so that there is a unique list of domains in an array. 
+ Should always return items in the array 
+ */
+  function findAllDomains(allSourceData) {
+
+    let newDomainsArray = [];
+
+    let sourceFieldNamesArray = Object.getOwnPropertyNames(allSourceData); // all field names in the source
+
+
+    for (let sourceFieldCounter = 0; sourceFieldCounter < sourceFieldNamesArray.length; sourceFieldCounter++) { // looping the array of source's eg insightly, brreg and so on
+        let sourceFieldName = sourceFieldNamesArray[sourceFieldCounter]; // name of the attribute in the source
+        let sourceRecord = allSourceData[sourceFieldName]; //the record we are going to search eg insightly_something
+
+        let sourceDomain = getNested(sourceRecord, "domain"); // get the domain if its there
+
+        if (sourceDomain != undefined) newDomainsArray.push(sourceDomain); // store it
+
+        let sourceDomainsArray = getNested(sourceRecord, "domains"); // get the domains array if its there
+
+
+        if (sourceDomainsArray != undefined) { // there was a value there                
+            
+            // now loop an push the domains in the array 
+            for (let domainCounter = 0; domainCounter < sourceDomainsArray.length; domainCounter++) { //loop all domans in te array
+                newDomainsArray.push(sourceDomainsArray[domainCounter]);
+            }
+
+        } 
+
+    } // end looping the array of all source records
+
+
+    newDomainsArray = removeDuplicatesInArray(newDomainsArray);
+
+    return newDomainsArray;
+
+
+}
+
 
 
 /** removeDuplicatesInArray
@@ -2429,18 +2547,8 @@ export function generateNewMasterRecord(currentData) {
         } // end looping trugh all fields in a MERGERECORD
 
 
-        //the domains field is not there if the organization is scraped 
-        //TODO: here we must have a function findAllDomains
-        let tmpDomainArray = getNested(newOrganizationMasterRecord, "domains"); 
-        if (!tmpDomainArray) { // no domains array
-            let tmpDomain = getNested(newOrganizationMasterRecord, "domain"); 
-            if ((tmpDomain != undefined) && (tmpDomain != null)) { // there is a domain
-                newOrganizationMasterRecord.domains = [];
-                newOrganizationMasterRecord.domains.push(tmpDomain); //put the 
-            }
-        }
-
-        
+        // loop all source data for domain and domains and return all of them in one array
+        newOrganizationMasterRecord.domains = findAllDomains(currentData.source); 
 
         // then we need to look at the netwok membership
         newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
