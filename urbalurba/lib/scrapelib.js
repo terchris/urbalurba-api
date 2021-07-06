@@ -30,6 +30,7 @@ import {
 } from "./logger.js";
 
 export const DISPLAYLOG = true;
+export const DISPLAYDEBUG = false;
 
 const MERGE_DATASET = "merges";
 const MERGEJOB_DATASET = "merge-jobs";
@@ -70,7 +71,7 @@ async function getAllMerges(config) {
 /** getMergesByIdNameANDentitytype
  get (should be just one) Merge by idName and entitytype
  */
-async function getMergesByIdNameANDentitytype(config, idName, entitytype) {
+export async function getMergesByIdNameANDentitytype(config, idName, entitytype) {
 
 
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "?entitytype=" + entitytype + "&idName=" + idName;
@@ -159,6 +160,11 @@ export async function updateMerge(config, newData, idName, jobStatus, mergeID, u
         newDisplayName = newMasterRecord.organization.displayName; // alway use the latest displayName
     }
 
+
+    // if there are members on the record. Then this is a network has members thatare scraped from their web page
+    if (newData.hasOwnProperty("members")) {
+        debugger;
+    }
 
 
     let mergeRecord = {
@@ -304,7 +310,7 @@ export async function updateMergeMasterRecord(config, newMasterRecord, jobStatus
 /** createMerge
  creates a new record in the merge dataset
  */
-async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource) {
+export async function createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource) {
 
     let tmpResultArray = [];
     let strapiRequestURL = config.STRAPIURI + MERGE_DATASET;
@@ -554,7 +560,7 @@ export async function pushData(config, data, idName, entitytype, jobStatus) {
     } else { // there is a previous merge record - we will update it
 
 
-        //if (DISPLAYLOG) console.log("pushData: idName:" + idName + " already has entitytype=" + entitytype);
+
 
         let existingData = mergeArray[0].data; // pick the first one                    
         if (!existingData.hasOwnProperty(config.DATA_SECTION_OUTPUT)) { // no secttion
@@ -930,20 +936,26 @@ export async function getJobArray_web(config, jobName) {
             let mergeRecord = jobArray[i];
 
 
-            let webObject = {
-                url: mergeRecord.web,
-                userData: {
-                    domain: mergeRecord.idName,
-                    id: mergeRecord.id,
-                    jobLog: mergeRecord.jobLog,
-                    displayName: mergeRecord.displayName
-                }
-            };
-            returnJobArray.push(webObject);
+            
+            if (mergeRecord.web) { // must have web address if we are going to webscrape
 
+                let webObject = {
+                    url: mergeRecord.web,
+                    userData: {
+                        domain: mergeRecord.idName,
+                        id: mergeRecord.id,
+                        jobLog: mergeRecord.jobLog,
+                        displayName: mergeRecord.displayName
+                    }
+                };
+                returnJobArray.push(webObject);
 
+            } else {
+                let logTxt = "1.9 getJobArray_web error. No web for idName="+ mergeRecord.idName; 
+                console.error(logTxt);
+                debugger
+            }
         }
-
     }
 
     return returnJobArray; //
@@ -1695,138 +1707,6 @@ export function member2mergeRecord(dataSource, SOURCE, MEMBERSHIPS, newData, exi
 
 
 
-/* updateMergeNetworks
-updates networks or create them if they do not exist.
-takes networkData as parameter. Returns the number of networks imported
-*/
-export async function updateMergeNetworks(config, mergeNetworkArray) {
-
-    let netCounter = 0;
-
-    let currentMergeNetworkRecord;
-
-    let entitytype = config.ENTITYTYPE_OUTPUT;
-    let jobStatus = config.JOBSTATUS_OUTPUT;
-    let jobName = config.JOBNAME;
-
-    let organizationNumber = null;
-    let urbalurbaIdName = null;
-    let sbn_insightly = null;
-    let domain = null;
-    let web = null;
-
-    for (netCounter = 0; netCounter < mergeNetworkArray.length; netCounter++) {
-
-
-        currentMergeNetworkRecord = mergeNetworkArray[netCounter];
-        currentMergeNetworkRecord.idName = string2IdKey(currentMergeNetworkRecord.idName); //make sure its a valid idName
-
-        let idName = currentMergeNetworkRecord.idName;
-
-
-        if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") network idName:", idName)
-
-        let mergeArray = await getMergesByIdNameANDentitytype(config, idName, entitytype);
-        if (mergeArray.length == 0) { // there is no previous record
-
-
-            let newData = {};
-
-            newData[config.DATA_SECTION_OUTPUT] = {};
-            newData[config.DATA_SECTION_OUTPUT][config.DATASOURCE] = currentMergeNetworkRecord;
-
-
-            // get all the top level ID's
-            urbalurbaIdName = currentMergeNetworkRecord.urbalurbaIdName; //assume there is
-            organizationNumber = currentMergeNetworkRecord.organizationNumber; //assume there is        
-            sbn_insightly = currentMergeNetworkRecord.sbn_insightly; //assume there is
-            domain = currentMergeNetworkRecord.domain; //assume there is
-            web = currentMergeNetworkRecord.web; //assume there is
-            web = addWebProtocol(web); // there is a posibility that the web address does not contain http:// or https://        
-
-            let mergeRecord = await createMerge(config, newData, idName, jobStatus, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, config.DATASOURCE);
-
-            if (mergeRecord == "none") { // there is was an error
-                let errorMessage = "Error creating network";
-                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);
-                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });
-                debugger;
-            } else {
-                let okMessage = "Success creating network "
-                if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
-                logger.info(okMessage, { "networkIdName": idName, "jobName": config.JOBNAME });
-            }
-
-
-
-        } else { // there is a previous merge record - we will update it
-
-            if (DISPLAYLOG) console.log("updateMergeNetworks: idName:" + idName + " already has entitytype=" + entitytype);
-
-
-            let existingData = mergeArray[0].data; // there should be only one - pick the first one                    
-            if (!existingData.hasOwnProperty(config.DATA_SECTION_OUTPUT)) { // no attribute
-                existingData[config.DATA_SECTION_OUTPUT] = {}; // create it                
-            }
-
-            existingData[config.DATA_SECTION_OUTPUT][config.DATASOURCE] = currentMergeNetworkRecord;
-
-
-            // get all the top level ID's
-            if (mergeArray[0].urbalurbaIdName) { //if there is a urbalurbaIdName
-                urbalurbaIdName = mergeArray[0].urbalurbaIdName; //keep the initial 
-            } else {
-                urbalurbaIdName = currentMergeNetworkRecord.urbalurbaIdName; //if not take the one from the new data
-            }
-
-
-            if (mergeArray[0].organizationNumber) { // we have a organizationNumber
-                organizationNumber = mergeArray[0].organizationNumber; // keep the initial
-            } else { // we take whatever is here
-                organizationNumber = currentMergeNetworkRecord.organizationNumber;
-            }
-
-
-            if (mergeArray[0].sbn_insightly) { // we have a insightly ID
-                sbn_insightly = mergeArray[0].sbn_insightly; // keep the initial
-            } else { // we take whatever is here
-                sbn_insightly = currentMergeNetworkRecord.sbn_insightly;
-            }
-
-            if (mergeArray[0].domain) { // we have a domain
-                domain = mergeArray[0].domain; // keep the initial
-            } else { // we take whatever is here
-                domain = currentMergeNetworkRecord.domain;
-            }
-
-            if (mergeArray[0].web) { // we have a web
-                web = mergeArray[0].web; // keep the initial
-            } else { // we take whatever is here
-                web = currentMergeNetworkRecord.web;
-            }
-
-            let updateMergeRecordResult = await updateMerge(config, existingData, idName, jobStatus, mergeArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, mergeArray[0].jobLog, config.DATASOURCE);
-
-            if (updateMergeRecordResult == "none") { // there is was an error
-                let errorMessage = "Error updating network";
-                if (DISPLAYLOG) console.error("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + errorMessage);
-                logger.error(errorMessage, { "networkIdName:": idName, "jobName": config.JOBNAME });
-                debugger;
-
-            } else {
-                let okMessage = "Success updating network "
-                if (DISPLAYLOG) console.log("updateMergeNetworks: (" + netCounter + ") networkIdName:" + idName + " -> " + okMessage);
-                logger.info(okMessage, { "networkIdName": idName, "jobName": config.JOBNAME });
-            }
-
-
-        }
-
-
-    }
-    if (DISPLAYLOG) console.log("updateNetworks finished. Processed total :", netCounter);
-    return netCounter;
-};
 
 
 
@@ -1929,10 +1809,11 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
     let numCreated = 0;
     let numError = 0;
 
+    let returnMsg = "";
+
     const SOURCE = "source";
     const MEMBERSHIPS = "memberships";
 
-    debugger; // must be tested after refactoring out updateMergeOrganization
 
     for (let orgCounter = 0; orgCounter < mergeOrganizationsArray.length; orgCounter++) {
         let idName = mergeOrganizationsArray[orgCounter].idName;
@@ -1985,19 +1866,19 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 let createResult = await createMerge(config, newData, idName, config.JOBSTATUS_OUTPUT, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, dataSource);
                 if (createResult == "none") { // there is was an error
                     let errorMessage = "Error creating merge";
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  idName:" + idName + " -> " + errorMessage);
                     logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
                     let okMessage = "Success creating merge "
-                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  idName:" + idName + " -> " + okMessage);
                     logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
                     numCreated++;
                 }
 
 
             } else { // there is an existing org here
-                if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
+                // if (DISPLAYLOG) console.log("updateMergeOrganizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  idName:" + idName + " already has entitytype=" + config.ENTITYTYPE_OUTPUT);
 
 
                 // split the information about a member into two parts. One "source" part and one "membership" part
@@ -2046,12 +1927,12 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
                 let updateResult = await updateMerge(config, updatedData, idName, config.JOBSTATUS_OUTPUT, existingMergeRecordArray[0].id, urbalurbaIdName, organizationNumber, sbn_insightly, domain, web, existingMergeRecordArray[0].jobLog, dataSource);
                 if (updateResult == "none") { // there is was an error
                     let errorMessage = "Error cannot update merge";
-                    if (DISPLAYLOG) console.error("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + errorMessage);
+                    if (DISPLAYLOG) console.error("updateMergeOrganizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  idName:" + idName + " -> " + errorMessage);
                     logger.error(errorMessage, { "idName:": idName, "jobName": config.JOBNAME });
                     numError++;
                 } else {
                     let okMessage = "Success updatig merge "
-                    if (DISPLAYLOG) console.log("updateMergeOrganizations: (" + orgCounter + ") idName:" + idName + " -> " + okMessage);
+                    if (DISPLAYLOG) console.log("updateMergeOrganizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  idName:" + idName + " -> " + okMessage);
                     logger.info(okMessage, { "idName": idName, "jobName": config.JOBNAME });
                     numUpdated++;
                 }
@@ -2060,14 +1941,17 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
 
         } else {
             let warningMessage = "Skipping. No idName for displayName=" + mergeOrganizationsArray[orgCounter].displayName;
-            if (DISPLAYLOG) console.error("splitNetwork2organizations: (" + orgCounter + ") " + warningMessage);
-            logger.warn(warningMessage, { "displayName": mergeOrganizationsArray[orgCounter].displayName, "jobName": config.JOBNAME });
+            if (DISPLAYLOG) console.error("splitNetwork2organizations: ( " + (orgCounter + 1) + "/" + mergeOrganizationsArray.length + ")  " + warningMessage);
+            logger.error(warningMessage, { "displayName": mergeOrganizationsArray[orgCounter].displayName, "jobName": config.JOBNAME });
+            numError++;
             debugger;
         }
 
     }
 
-    return numUpdated + numCreated;
+
+    returnMsg = "Created: " + numCreated + " Updated: " + numUpdated + " Errors: " + numError;
+    return returnMsg;
 
 
 }
@@ -2076,7 +1960,7 @@ export async function updateMergeOrganizations(config, mergeOrganizationsArray, 
  Takes the existing existingMergeRecord and the insightlyRecord
  Returns a full merge record that can be written to merge
  */
-export function updateMergeOrganizationRecordWithInsightly(existingMergeRecord, insightlyRecord, DATASOURCE, SOURCE, MEMBERSHIPS ) {
+export function updateMergeOrganizationRecordWithInsightly(existingMergeRecord, insightlyRecord, DATASOURCE, SOURCE, MEMBERSHIPS) {
 
     let insightlyMergeRecord = insightly2mergeRecord(insightlyRecord); // first create a mergeRecord that holds the insightly info
     // split the information about a member into two parts. One "source" part and one "membership" part
@@ -2130,7 +2014,7 @@ export function updateMergeOrganizationRecordWithInsightly(existingMergeRecord, 
 
     // now build the updatedMergeRecord that will be returned
     let updatedMergeRecord = existingMergeRecord;
-    updatedMergeRecord.urbalurbaIdName = urbalurbaIdName;    
+    updatedMergeRecord.urbalurbaIdName = urbalurbaIdName;
     updatedMergeRecord.organizationNumber = organizationNumber;
     updatedMergeRecord.sbn_insightly = sbn_insightly;
     updatedMergeRecord.domain = domain;
@@ -2331,37 +2215,41 @@ function findAllCategories(currentData) {
 /** findAllNetworkmemberships
  takes the data.memberships as parameter. For each property here it return the networkmemberships.
  This so that there is a unique list of networks in an array. Should always return items in the array
-  - if not then there s something wron with the program that added the organization. 
+ 
+ In the cae that this is a network. Then it will not have memberships. We will then return an empty array
  */
 function findAllNetworkmemberships(memberships) {
 
     let newNetworkmemberships = [];
 
-    let membershipFieldsArray = Object.getOwnPropertyNames(memberships); // all field names in the memberships: attribute    
+    if (memberships) { // there are network memberships here
+        let membershipFieldsArray = Object.getOwnPropertyNames(memberships); // all field names in the memberships: attribute    
 
 
-    for (let membFieldNum = 0; membFieldNum < membershipFieldsArray.length; membFieldNum++) { // looping the array of memberships: attributes
-        let membFieldName = membershipFieldsArray[membFieldNum]; // name of the attribute in the info:
-        let memberData = memberships[membFieldName]; //the record we are going to search eg insightly_something
+        for (let membFieldNum = 0; membFieldNum < membershipFieldsArray.length; membFieldNum++) { // looping the array of memberships: attributes
+            let membFieldName = membershipFieldsArray[membFieldNum]; // name of the attribute in the info:
+            let memberData = memberships[membFieldName]; //the record we are going to search eg insightly_something
 
-        let networkmemberships = getNested(memberData, "networkmemberships"); // get the networkmemberships array
+            let networkmemberships = getNested(memberData, "networkmemberships"); // get the networkmemberships array
 
 
-        if (networkmemberships != undefined) { // there was a value there                
+            if (networkmemberships != undefined) { // there was a value there                
 
-            // now loop an push the values to newNetworkmemberships
-            for (let netCount = 0; netCount < networkmemberships.length; netCount++) { //loop all networks
-                newNetworkmemberships.push(networkmemberships[netCount]);
+                // now loop an push the values to newNetworkmemberships
+                for (let netCount = 0; netCount < networkmemberships.length; netCount++) { //loop all networks
+                    newNetworkmemberships.push(networkmemberships[netCount]);
+                }
+
+            } else { // There was no networks
+                if (DISPLAYLOG) console.log("findAllNetworkmemberships: membFieldName:" + membFieldName + " has no networkmembership!")
             }
 
-        } else { // There was no networks
-            if (DISPLAYLOG) console.log("findAllNetworkmemberships: membFieldName:" + membFieldName + " has no networkmembership!")
-        }
-
-    } // end looping the array of info: attributes
+        } // end looping the array of info: attributes
 
 
-    newNetworkmemberships = removeDuplicatesInArray(newNetworkmemberships);
+        newNetworkmemberships = removeDuplicatesInArray(newNetworkmemberships);
+
+    }
 
     return newNetworkmemberships;
 
@@ -2373,7 +2261,7 @@ function findAllNetworkmemberships(memberships) {
  This so that there is a unique list of domains in an array. 
  Should always return items in the array 
  */
-  function findAllDomains(allSourceData) {
+function findAllDomains(allSourceData) {
 
     let newDomainsArray = [];
 
@@ -2392,13 +2280,13 @@ function findAllNetworkmemberships(memberships) {
 
 
         if (sourceDomainsArray != undefined) { // there was a value there                
-            
+
             // now loop an push the domains in the array 
             for (let domainCounter = 0; domainCounter < sourceDomainsArray.length; domainCounter++) { //loop all domans in te array
                 newDomainsArray.push(sourceDomainsArray[domainCounter]);
             }
 
-        } 
+        }
 
     } // end looping the array of all source records
 
@@ -2437,106 +2325,96 @@ export function generateNewMasterRecord(currentData) {
     let newOrganizationMasterRecord = {}; // where we store the default data we find on a organization
     let newNetworkmemberships = []; // where we store the networks the organization is member of
 
-    if (currentData.hasOwnProperty("members")) {
-        newMasterRecord = "none";
-        //console.log("generateNewMasterRecord: missig code for merging members to masterRecord");
-    } else { // it is a organization - lets merge it
+
+    // first we need to get all the fields we are going to use for merging
+    let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
+
+    for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
+        let fieldName = mergeRecordFieldNameArray[MergeRecordFieldNum];
+
+        // now we have he field name, but we dont know if it has further properties.
+        // a property can be A) Field (num og string) B) an array C) an object containing objects/arrays D) categories
+        // we must use the fields on the jobs2processArray[readyJob].organizationNumber sbn_insighty and so on - and NOT from the attributes n the info:
 
 
+        if (fieldName == "categories") { // special handling of categories
+            let categories = findAllCategories(currentData);
+            if (categories != "none") { // test if categories are empty
+                newOrganizationMasterRecord.categories = categories;
+            }
 
 
-        // first we need to get all the fields we are going to use for merging
-        let mergeRecordFieldNameArray = Object.getOwnPropertyNames(masterRecordStructure); //get list of all properties i the MERGERECORD
+        } else { // it has to be one of the A) to C) cases
 
-        for (let MergeRecordFieldNum = 0; MergeRecordFieldNum < mergeRecordFieldNameArray.length; MergeRecordFieldNum++) { //loop the fields in a MERGERECORD
-            let fieldName = mergeRecordFieldNameArray[MergeRecordFieldNum];
+            //let mergerecordFieldValue = config.MERGERECORD[fieldName]; // the field we are looking at      
+            let mergerecordFieldValue = masterRecordStructure[fieldName]; // the field we are looking at      
+            let isItObject = typeof mergerecordFieldValue == "object";
+            let isItArray = Array.isArray(mergerecordFieldValue);
 
-            // now we have he field name, but we dont know if it has further properties.
-            // a property can be A) Field (num og string) B) an array C) an object containing objects/arrays D) categories
-            // we must use the fields on the jobs2processArray[readyJob].organizationNumber sbn_insighty and so on - and NOT from the attributes n the info:
+            let fieldNameValue;
 
-
-            if (fieldName == "categories") { // special handling of categories
-                let categories = findAllCategories(currentData);
-                if (categories != "none") { // test if categories are empty
-                    newOrganizationMasterRecord.categories = categories;
-                }
+            if (isItObject && !isItArray) {
 
 
-            } else { // it has to be one of the A) to C) cases
+                // if it's an objet we must loop the object 
+                // first note the parent
+                let parentFieldname = mergeRecordFieldNameArray[MergeRecordFieldNum];
+                // then loop it's children
+                Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
 
-                //let mergerecordFieldValue = config.MERGERECORD[fieldName]; // the field we are looking at      
-                let mergerecordFieldValue = masterRecordStructure[fieldName]; // the field we are looking at      
-                let isItObject = typeof mergerecordFieldValue == "object";
-                let isItArray = Array.isArray(mergerecordFieldValue);
+                    //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
 
-                let fieldNameValue;
-
-                if (isItObject && !isItArray) {
-
-
-                    // if it's an objet we must loop the object 
-                    // first note the parent
-                    let parentFieldname = mergeRecordFieldNameArray[MergeRecordFieldNum];
-                    // then loop it's children
-                    Object.entries(mergerecordFieldValue).forEach(([key, value]) => {
-
-                        //console.log("parentFieldname=" + parentFieldname + " key=" + key + " value=" + value);
-
-                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, key, parentFieldname, currentData);
-                        if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
-                            if (fieldNameValue != undefined) { // only store a value if there is a value to store
-                                newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
-                            }
-                        } else { // we need to add the parentFieldname as well
-                            if (fieldNameValue != undefined) { // only store a value if there is a value to store
-                                newOrganizationMasterRecord[parentFieldname] = {}; // create it first
-                                newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
-                            }
-
+                    fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, key, parentFieldname, currentData);
+                    if (newOrganizationMasterRecord.hasOwnProperty(parentFieldname)) { // the parentFieldname property is there
+                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
                         }
-
-
-                    });
-                } else {
-
-                    if (isItObject && isItArray) { // its an array
-
-                        //console.log("its an array");
-                        fieldNameValue = findAllArrayItems(fieldName, null, currentData);
-                        if (fieldNameValue.length > 0) {
-                            newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value(s) we found
-                        }
-
-
-                    } else { // not object and not array - just copy the key and value
-
-                        fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, fieldName, null, currentData);
-                        // we can get a object or just a string here. 
-                        //This means that it can also be an empty object or string - and that we do not want to store
-
-                        let copyValue = true;
-                        if (fieldNameValue) { // we have a velue - lets examine it
-
-                            if (typeof fieldNameValue == "object") {
-                                if (Object.entries(fieldNameValue).length === 0) {
-                                    copyValue = false; // its an empty object
-                                }
-                            } else {
-                                if (!fieldNameValue) {
-                                    copyValue = false; // its an empty or null value
-                                }
-                            }
-                        } else { // no value
-                            copyValue = false; // its an empty or null value
-                        }
-
-                        if (copyValue) {
-                            newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value we found
+                    } else { // we need to add the parentFieldname as well
+                        if (fieldNameValue != undefined) { // only store a value if there is a value to store
+                            newOrganizationMasterRecord[parentFieldname] = {}; // create it first
+                            newOrganizationMasterRecord[parentFieldname][key] = fieldNameValue; // store the value we found
                         }
 
                     }
 
+
+                });
+            } else {
+
+                if (isItObject && isItArray) { // its an array
+
+                    //console.log("its an array");
+                    fieldNameValue = findAllArrayItems(fieldName, null, currentData);
+                    if (fieldNameValue.length > 0) {
+                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value(s) we found
+                    }
+
+
+                } else { // not object and not array - just copy the key and value
+
+                    fieldNameValue = findFirstField(mergePriorityArray, mergeFieldPriority, fieldName, null, currentData);
+                    // we can get a object or just a string here. 
+                    //This means that it can also be an empty object or string - and that we do not want to store
+
+                    let copyValue = true;
+                    if (fieldNameValue) { // we have a velue - lets examine it
+
+                        if (typeof fieldNameValue == "object") {
+                            if (Object.entries(fieldNameValue).length === 0) {
+                                copyValue = false; // its an empty object
+                            }
+                        } else {
+                            if (!fieldNameValue) {
+                                copyValue = false; // its an empty or null value
+                            }
+                        }
+                    } else { // no value
+                        copyValue = false; // its an empty or null value
+                    }
+
+                    if (copyValue) {
+                        newOrganizationMasterRecord[fieldName] = fieldNameValue; // store the value we found
+                    }
 
                 }
 
@@ -2544,21 +2422,25 @@ export function generateNewMasterRecord(currentData) {
             }
 
 
-        } // end looping trugh all fields in a MERGERECORD
+        }
 
 
-        // loop all source data for domain and domains and return all of them in one array
-        newOrganizationMasterRecord.domains = findAllDomains(currentData.source); 
+    } // end looping trugh all fields in a MERGERECORD
 
-        // then we need to look at the netwok membership
-        newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
 
-        // then- before we write the update we need to put the parameters right
-        newMasterRecord.organization = newOrganizationMasterRecord;
-        newMasterRecord.networkmemberships = newNetworkmemberships
-        newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+    // loop all source data for domain and domains and return all of them in one array
+    newOrganizationMasterRecord.domains = findAllDomains(currentData.source);
 
-    }
+    // then we need to look at the netwok membership
+    newNetworkmemberships = findAllNetworkmemberships(currentData.memberships);
+
+    // then- before we write the update we need to put the parameters right
+    newMasterRecord.organization = newOrganizationMasterRecord;
+    newMasterRecord.networkmemberships = newNetworkmemberships
+    newMasterRecord.urbalurbaScrapeDate = new Date().toISOString();
+
+
+
 
     return newMasterRecord;
 
@@ -2782,5 +2664,100 @@ async function isMergeJobTypeBlocked(config) {
 
     return runningInParalell;
 
+}
+
+/** getMergesByDomanANDentitytype
+    simple and not complete version - sraches only in the domain field- it must also search the domains array
+    
+    takes a domain and its entitytype - returns an array with merge records
+    if found it contains records - if not it is empty.
+    if there is an API error "none" is returned
+     */
+export async function getMergesByDomanANDentitytype(config, domain, entitytype) {
+
+    let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "?entitytype=" + entitytype + "&domain=" + domain;
+    let data = "none"
+    let result;
+
+    try {
+        result = await axios.get(strapiRequestURL, {
+            headers: {
+                Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 getMergesByDomanANDentitytype catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    return data;
+
+}
+
+/** getMergesByUrbalurbaIdNameANDentitytype
+    
+    takes a urbalurbaIdName and its entitytype - returns an array with merge records
+    if found it contains records - if not it is empty.
+    if there is an API error "none" is returned
+     */
+export async function getMergesByUrbalurbaIdNameANDentitytype(config, urbalurbaIdName, entitytype) {
+
+    let strapiRequestURL = config.STRAPIURI + MERGE_DATASET + "?entitytype=" + entitytype + "&urbalurbaIdName=" + urbalurbaIdName;
+    let data = "none"
+    let result;
+
+    try {
+        result = await axios.get(strapiRequestURL, {
+            headers: {
+                Authorization: `Bearer ${config.STRAPI_APIKEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        data = result.data;
+
+    }
+    catch (e) {
+        let logTxt = "1.9 getMergesByUrbalurbaIdNameANDentitytype catch error :" + JSON.stringify(e) + " =>result is:" + JSON.stringify(result);
+        console.error(logTxt);
+        debugger
+    }
+
+    return data;
+
+}
+
+
+/** findMergesByDomains
+ Takes an array of domains and search in merge for records that has these domain names
+ a merge has its primary domain in the domain field and its asociated domains in domains array.
+ Returns an array with the merge records that has the domains.
+ If there are none, then a empty array is returned
+ 
+duplicate merges are removed from the returned array -TODO
+ 
+ */
+export async function findMergesByDomains(searchDomainNameArray, config) {
+
+    let returnMergeArray = [];
+
+
+    for (let i = 0; i < searchDomainNameArray.length; i++) { // loop the domains
+        let searchIdName = searchDomainNameArray[i];
+        let existingMergeRecordArray = await getMergesByDomanANDentitytype(config, searchIdName, config.ENTITYTYPE_OUTPUT);
+        if (existingMergeRecordArray.length > 0) { // we found one or more merge's
+            // now we will store them in returnMergeArray
+            for (let j = 0; j < existingMergeRecordArray.length; j++) { // loop the merges found
+                returnMergeArray.push(existingMergeRecordArray[j]);
+            }
+        }
+    }
+
+    //TODO: remove duplicates
+    return returnMergeArray;
 }
 

@@ -2932,11 +2932,13 @@ function findStrapiEntityWithInsightlyID(strapiAllOrganizations, insightlyID) {
  * reads all organizations in insightly 
  * that are marked as a network
  * by using the url INSIGHTLY_NETWORK_SEARCH_URL
+ * 
+ * returns "none" if there are api / network problems
  */
 async function getAllInsightlyNetworks() {
 
     let insightlyRequestURL = INSIGHTLY_NETWORKS_URL;
-    let data;
+    let data = "none";
     let result;
 
     try {
@@ -2990,7 +2992,7 @@ export async function getAllInsightlyOrganizationsByIdName(idName) {
  * remember that when searching for "123" you wil get "123" and "1234"
  there might be more than one record.
  */
- export async function getAllInsightlyOrganizationsByOrganizationName(organizationName) {
+export async function getAllInsightlyOrganizationsByOrganizationName(organizationName) {
 
     let organizationNameCoded = encodeURIComponent(organizationName); // encode it correctly
     let insightlyRequestURL = INSIGHTLY_ORGANIZATION_ORGANISATION_NAME_SEARCH_URL + organizationNameCoded;
@@ -3020,7 +3022,7 @@ export async function getAllInsightlyOrganizationsByIdName(idName) {
  * reads all organizations in insightly that has the domain name
  there might be more than one record.
  */
- export async function getAllInsightlyOrganizationsByDomainName(domainName) {
+export async function getAllInsightlyOrganizationsByDomainName(domainName) {
 
 
     let insightlyRequestURL = INSIGHTLY_ORGANIZATION_DOMAIN_SEARCH_URL + domainName;
@@ -3067,28 +3069,32 @@ export async function readNetworksFromInsightly() {
 
 
     let insightlyAllNetworkOrganizations = await getAllInsightlyNetworks();
+    if (insightlyAllNetworkOrganizations != "none") { // no problems
 
-    for (let i = 0; i < insightlyAllNetworkOrganizations.length; i++) {
-        let currentIinsightlyNetworkOrganizationRecord = insightlyAllNetworkOrganizations[i];
+        for (let i = 0; i < insightlyAllNetworkOrganizations.length; i++) {
+            let currentIinsightlyNetworkOrganizationRecord = insightlyAllNetworkOrganizations[i];
 
 
-        let currentMergeRecord = insightly2mergeRecord(currentIinsightlyNetworkOrganizationRecord);
+            let currentMergeRecord = insightly2mergeRecord(currentIinsightlyNetworkOrganizationRecord);
 
-        //then we need to extract the network specific fields
-        let networkName = await getInsightlyCustomField("NetworkName", currentIinsightlyNetworkOrganizationRecord);
-        if (networkName) {
-            currentMergeRecord.idName = string2IdKey(networkName); //here we are changing the ID - so incase they have different ID' that is possible
+            //then we need to extract the network specific fields
+            let networkName = await getInsightlyCustomField("NetworkName", currentIinsightlyNetworkOrganizationRecord);
+            if (networkName) {
+                currentMergeRecord.idName = string2IdKey(networkName); //here we are changing the ID - so incase they have different ID' that is possible
+
+                let networkMemberTypes = await getInsightlyCustomField("networkMemberTypes", currentIinsightlyNetworkOrganizationRecord);
+
+                if (networkMemberTypes) currentMergeRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
+
+                returnArray.push(currentMergeRecord);
+
+            } else { // we are in trouble - cant use a network with no idName
+                debugger;
+            }
+
+
         }
-
-        let networkMemberTypes = await getInsightlyCustomField("networkMemberTypes", currentIinsightlyNetworkOrganizationRecord);
-
-        if (networkMemberTypes) currentMergeRecord.networkMemberTypes = JSON.parse(networkMemberTypes);
-
-//JALLA: delete         currentMergeRecord.sbn_insightly = "insightlysync"
-
-        returnArray.push(currentMergeRecord);
     }
-
     return returnArray;
 
 }
@@ -3608,17 +3614,33 @@ export async function insightlyOrganizationArrayUpdate(insightlyOrganizationsArr
  takes a insightly record and transforms it to a merge record 
  This one should replace the various transformations
 
-see doc for insightly2strapiEntityRecord
+ If the CKAN_NAME (idName) is not set and there is just one email domain then we set it to the email domain.
+ if there is more than one emaildomain or the emaildomain is missing - then "none" returned.
+
+
+ stil valid??? ->see doc for insightly2strapiEntityRecord
  */
 export function insightly2mergeRecord(insightlyRecord) {
     let mergeRecord = {};
     let socialLinks = {};
 
+    let emailDomainArray = insightlyGetEmailDomains(insightlyRecord); // get the domains first - we need them in case we will do a tric with missing idName
     mergeRecord.idName = getInsightlyCustomField("CKAN_NAME", insightlyRecord).toString();
-    mergeRecord.urbalurbaIdName = getInsightlyCustomField("urbalurbaIdName", insightlyRecord).toString();
+
+    // if the CKAN_NAME (idName) is not set in Insightly - we can automatically set it to the domain name
+    // this is a bit risky - if the org has just ONE domain - then we take the risk
+    if (mergeRecord.idName == "") { // no idName
+        if (emailDomainArray.length == 1) {
+            mergeRecord.idName = emailDomainArray[0]; // pick the first and only 
+        }
+    }
+
     // we also need to make sure the idName is a legal idName
     mergeRecord.idName = string2IdKey(mergeRecord.idName);
+
     mergeRecord.urbalurbaScrapeDate = new Date().toISOString();
+    mergeRecord.urbalurbaIdName = getInsightlyCustomField("urbalurbaIdName", insightlyRecord).toString();
+
 
     if (mergeRecord.idName != "") {
         mergeRecord.domain = mergeRecord.idName; // this is how its is defined - the domain is the id
@@ -3670,9 +3692,9 @@ export function insightly2mergeRecord(insightlyRecord) {
             mergeRecord.sbn_insightly = tmpResult;
         }
 
-        tmpResult = insightlyGetEmailDomains(insightlyRecord);
-        if (tmpResult.length > 0) {
-            mergeRecord.domains = tmpResult;
+        // add the domains - if present
+        if (emailDomainArray.length > 0) {
+            mergeRecord.domains = emailDomainArray;
         }
 
 
@@ -4095,10 +4117,10 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
 
 
             //the urbalurbaIdName 
-            tmpResult = getNested(mergeRecord, "organization","urbalurbaIdName",);
+            tmpResult = getNested(mergeRecord, "organization", "urbalurbaIdName",);
             if (tmpResult != undefined) { // its there
                 setCustomFieldResult = setInsightlyCustomField("urbalurbaIdName", tmpResult, updatedInsightlyRecord);
-            }            
+            }
 
 
             //the adminLocation fields
@@ -4169,19 +4191,19 @@ export function merge2insightlyRecord(mergeRecord, existingInsightlyRecord) {
                 setCustomFieldResult = setInsightlyCustomField("CKAN_NAME", tmpResult, updatedInsightlyRecord);
             }
 
-/* DELETE old stuff    
-        //fylke is  countyName
-            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
-            if (tmpResult != undefined) { // its there
-                setCustomFieldResult = setInsightlyCustomField("fylke", tmpResult, updatedInsightlyRecord);
-            }
- 
-            //kommunenr is  countyName
-            tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
-            if (tmpResult != undefined) { // its there
-                setCustomFieldResult = setInsightlyCustomField("kommunenr", tmpResult, updatedInsightlyRecord);
-            }
-*/
+            /* DELETE old stuff    
+                    //fylke is  countyName
+                        tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "countyName");
+                        if (tmpResult != undefined) { // its there
+                            setCustomFieldResult = setInsightlyCustomField("fylke", tmpResult, updatedInsightlyRecord);
+                        }
+             
+                        //kommunenr is  countyName
+                        tmpResult = getNested(mergeRecord, "organization", "location", "adminLocation", "municipalityId");
+                        if (tmpResult != undefined) { // its there
+                            setCustomFieldResult = setInsightlyCustomField("kommunenr", tmpResult, updatedInsightlyRecord);
+                        }
+            */
 
             //Organisasjonsnummer is organizationNumber 
             tmpResult = getNested(mergeRecord, "organization", "organizationNumber");

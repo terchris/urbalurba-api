@@ -943,6 +943,7 @@ export function companyName2displayName(companyName) {
   const removeEndings = [
     " ASA",
     " AS",
+    " A/S",
     " AB",
     " IKS",
     " ANS",
