@@ -1,6 +1,6 @@
 {
   "name": "urbalurba-api",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "functions for accessing the urbalura backend",
   "main": "index.js",
   "type": "module",
@@ -20,6 +20,7 @@
   "homepage": "https://github.com/terchris/urbalurba-api#readme",
   "dependencies": {
     "@apollo/client": "^3.3.7",
+    "algoliasearch": "^4.10.5",
     "axios": "^0.21.1",
     "coralogix-logger-winston": "^1.0.11",
     "cross-fetch": "^3.0.6",
