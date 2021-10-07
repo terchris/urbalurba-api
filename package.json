@@ -1,6 +1,6 @@
 {
   "name": "urbalurba-api",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "functions for accessing the urbalura backend",
   "main": "index.js",
   "type": "module",
