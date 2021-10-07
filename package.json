@@ -19,16 +19,16 @@
   },
   "homepage": "https://github.com/terchris/urbalurba-api#readme",
   "dependencies": {
-    "@apollo/client": "^3.3.7",
+    "@apollo/client": "^3.4.16",
     "algoliasearch": "^4.10.5",
-    "axios": "^0.21.1",
+    "axios": "^0.22.0",
     "coralogix-logger-winston": "^1.0.11",
-    "cross-fetch": "^3.0.6",
-    "dotenv": "^8.2.0",
-    "graphql": "^15.5.0",
-    "nanoid": "^3.1.22",
-    "react": "^17.0.1",
-    "slugify": "^1.4.6",
+    "cross-fetch": "^3.1.4",
+    "dotenv": "^10.0.0",
+    "graphql": "^15.6.1",
+    "nanoid": "^3.1.29",
+    "react": "^17.0.2",
+    "slugify": "^1.6.1",
     "winston": "^3.3.3"
   }
 }
