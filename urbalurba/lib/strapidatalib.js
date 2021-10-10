@@ -374,7 +374,7 @@ export async function getEntityIDByIdName(idName) {
 }
 
 export async function getNetworkCategoriesList(networkIdName) {
-// renamed from getAllCategoriesList to getNetworkCategoriesList
+  // renamed from getAllCategoriesList to getNetworkCategoriesList
 
   let blockSize = 99; //how many  to read in one read
   let cursor = 0; // where in the result set we will start from.
@@ -909,7 +909,7 @@ export async function updateCategory(category, categoryID) {
     "description": category.description,
     "categoryType": category.categoryType,
     "color": category.color,
-    "internalImage": interchangeImage2StrapiImage(category.image)    
+    "internalImage": interchangeImage2StrapiImage(category.image)
   };
 
   let ReturnCategoryID = "none"; //assume its not there
@@ -958,7 +958,7 @@ export async function createCategory(category) {
     "description": category.description,
     "categoryType": category.categoryType,
     "color": category.color,
-    "internalImage": interchangeImage2StrapiImage(category.image)    
+    "internalImage": interchangeImage2StrapiImage(category.image)
 
   };
 
@@ -1094,7 +1094,7 @@ export async function updateCategoryitem(categoryItem, categoryItemID) {
     "description": categoryItem.description,
     "color": categoryItem.color,
     "sortOrder": categoryItem.sortOrder,
-    "internalImage": interchangeImage2StrapiImage(categoryItem.image)    
+    "internalImage": interchangeImage2StrapiImage(categoryItem.image)
   };
 
 
@@ -1142,7 +1142,7 @@ export async function createCategoryitem(categoryItem, parentCategoryID) {
     "description": categoryItem.description,
     "sortOrder": categoryItem.sortOrder,
     "color": categoryItem.color,
-    "internalImage": interchangeImage2StrapiImage(categoryItem.image)    
+    "internalImage": interchangeImage2StrapiImage(categoryItem.image)
   };
 
   let ReturnCategoryItemID = "none"; //assume its not there
@@ -1344,7 +1344,7 @@ export async function updateEntitytype(entitytype, entitytypeID) {
     "idName": entitytype.idName,
     "displayName": entitytype.displayName,
     "summary": entitytype.summary,
-    "internalImage": interchangeImage2StrapiImage(entitytype.image)    
+    "internalImage": interchangeImage2StrapiImage(entitytype.image)
   };
 
 
@@ -1386,7 +1386,7 @@ export async function createEntitytype(entitytype) {
     "idName": entitytype.idName,
     "displayName": entitytype.displayName,
     "summary": entitytype.summary,
-    "internalImage": interchangeImage2StrapiImage(entitytype.image)    
+    "internalImage": interchangeImage2StrapiImage(entitytype.image)
   };
 
   let ReturnID = "none"; //assume its not there
@@ -1915,7 +1915,7 @@ The relation between these is the answer to the categoryitem question
 the text field is used for writing the relation in plain text
 the entityCategoryAnswerText is used when the answer has a text answer
 */
-export async function createEntityCategoryAnswer(entityCategoryID, categoryitemID,text, entityCategoryAnswerText) {
+export async function createEntityCategoryAnswer(entityCategoryID, categoryitemID, text, entityCategoryAnswerText) {
 
   let response;
   let ReturnID = "none"; //assume its not there
@@ -1927,7 +1927,7 @@ export async function createEntityCategoryAnswer(entityCategoryID, categoryitemI
     "text": text
   };
 
-  
+
   try {
 
     response = await apolloClient.mutate({
@@ -2431,20 +2431,20 @@ export async function resignEntityNetworkMembership(entityNetworkMembershipID, t
  * dataSource = text describing where the data is coming from. eg Insightly, github solutions, 
  * dataWho = what/who started the import
  */
-export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdName, networkIdName,  dataSource, dataWho) {
+export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdName, networkIdName, dataSource, dataWho) {
 
   let sourceTxt = "";
-  let returnResult ="OK"
+  let returnResult = "OK"
   let entityNetworkMemberID = "";
 
-  sourceTxt = "Entity:" + entityIdName + ",Network:" + networkIdName + ",Source:" + dataSource + ",Who:"+ dataWho + ",Time:"+ new Date().toISOString(); 
+  sourceTxt = "Entity:" + entityIdName + ",Network:" + networkIdName + ",Source:" + dataSource + ",Who:" + dataWho + ",Time:" + new Date().toISOString();
 
   entityNetworkMemberID = await getEntityNetworkMembershipID(entityID, networkID);
 
   if (entityNetworkMemberID != "none") { //there is a relation between the entity and the network.
 
     let TMPentityNetworkMemberID; //using TMPentityNetworkMemberID and not reusing entityNetworkMemberID in case that fail on the first update
-    
+
     // first we update applied status
     //DEL sourceTxt = "Entity:" + entityIdName + ",Network:" + networkIdName + ",Source:" + dataSource + ",Who:"+ dataWho + ",Time:"+ new Date().toISOString(); 
     let appliedBy = dataWho;
@@ -2456,7 +2456,7 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
     } else {
       console.error("Err. cant make entity a member:", sourceTxt);
       debugger
-      returnResult ="Err";
+      returnResult = "Err";
     }
 
     // second we update approved status
@@ -2469,7 +2469,7 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
     } else {
       console.error("Err. cant make entity a member:", sourceTxt);
       debugger
-      returnResult ="Err";
+      returnResult = "Err";
     }
 
 
@@ -2482,7 +2482,7 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
       let TMPentityNetworkMemberID;
 
       // first we update applied status
-      
+
       let appliedBy = dataWho;
       // skip this let appliedDate = currentStrapiRecord.insightlyTmpFields.DATE_CREATED_UTC.substring(0, currentStrapiRecord.insightlyTmpFields.DATE_CREATED_UTC.indexOf(" "));  //extract just the date
       let appliedDate = new Date().toISOString().substring(0, 10);
@@ -2492,7 +2492,7 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
       } else {
         console.error("Err. cant make entity a member:", sourceTxt);
         debugger
-        returnResult ="Err";
+        returnResult = "Err";
       }
 
       // second we update approved status
@@ -2504,13 +2504,13 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
         console.log(sourceTxt + " Now approved");
       } else {
         console.error("Err. cant make entity a member:", sourceTxt);
-        returnResult ="Err";
+        returnResult = "Err";
       }
 
 
 
     } else { // trouble - cant create the relation 
-      returnResult ="Err";
+      returnResult = "Err";
       console.error("Err. cant create relation between entity and network:", sourceTxt);
       debugger
     }
@@ -2530,35 +2530,35 @@ export async function makeEntityMemberOfNetwork(entityID, networkID, entityIdNam
  * returns OK if all updates was good 
  * if problems it returns te number of problems 
  */
-export async function makeEntityMemberOfAllNetworks(currentEntityStrapiRecordID, entityIdName, networkMembershipsArray, dataSource, dataWho ) {
+export async function makeEntityMemberOfAllNetworks(currentEntityStrapiRecordID, entityIdName, networkMembershipsArray, dataSource, dataWho) {
 
-let returnResult = "OK";
-let memberResult = "";
-let problems =0;
+  let returnResult = "OK";
+  let memberResult = "";
+  let problems = 0;
 
 
   // now make the entity member of the NETWORK
-  
+
   for (let networkCounter = 0; networkCounter < networkMembershipsArray.length; networkCounter++) { //loop all the networks the entity is a member of
     let networkIdName = networkMembershipsArray[networkCounter];
     let networkID = await getNetworkIDByIdName(networkIdName);
     if (networkID != "none") { //yes it exists - we need to update membership
       // now make the org member of the NETWORK
-      memberResult = await makeEntityMemberOfNetwork(currentEntityStrapiRecordID, networkID, entityIdName, networkIdName, dataSource, dataWho);                           
+      memberResult = await makeEntityMemberOfNetwork(currentEntityStrapiRecordID, networkID, entityIdName, networkIdName, dataSource, dataWho);
       if (memberResult != "OK") {
         problems++;
       }
 
     }
     else {
-      console.error("makeEntityMemberOfAllNetworks: Error Network does not exist:", networkIdName );
+      console.error("makeEntityMemberOfAllNetworks: Error Network does not exist:", networkIdName);
       problems++;
       debugger;
     }
 
   } //end looping network memberships
 
-if (problems) returnResult = problems;
+  if (problems) returnResult = problems;
 
   return returnResult;
 }
@@ -3346,10 +3346,10 @@ export function strapi2interchangeEntityRecord(strapiRecord) {
 
   tmpResult = getNested(strapiRecord, "status");
   if ((tmpResult != undefined) && (tmpResult != null)) { // there is a status 
-    interchangeRecord.status = strapiRecord.status;
+    interchangeRecord.status = removeTypename(strapiRecord.status);
     //TODO remove status.__typename
   }
-//TODO: use function to convert image structure
+  //TODO: use function to convert image structure
   interchangeRecord.image = {
     "icon": getIconImage(strapiRecord.image, strapiRecord.internalImage, "entity"),
     "profile": getProfileImage(strapiRecord.image, strapiRecord.internalImage, "entity"),
@@ -3397,7 +3397,7 @@ export function strapi2interchangeEntityRecord(strapiRecord) {
   // the brreg stuff
   tmpResult = getNested(strapiRecord, "brreg");
   if ((tmpResult != undefined) && (tmpResult != null)) { // there is a brreg
-    interchangeRecord.brreg = tmpResult;
+    interchangeRecord.brreg = removeTypename(tmpResult);
   }
 
 
@@ -3412,7 +3412,7 @@ export function strapi2interchangeEntityRecord(strapiRecord) {
 
   tmpResult = getNested(strapiRecord, "entity_network_memberships");
   if ((tmpResult != undefined) && (tmpResult != null)) { // there is a entity_network_memberships
-    interchangeRecord.networkMemberships = array2idNameArray(strapiRecord.entity_network_memberships);
+    interchangeRecord.networkMemberships = strapiNetworkMembersips2networkDomainArray(strapiRecord.entity_network_memberships);
   }
 
   tmpResult = getNested(strapiRecord, "entity_categories");
@@ -3433,12 +3433,11 @@ export function strapi2interchangeEntityRecord(strapiRecord) {
 
 
   //social links
-
   tmpResult = getSocialLinks(strapiRecord);
   if (tmpResult != "none")
-    interchangeRecord.socialLinks = tmpResult;
+    interchangeRecord.socialLinks = removeTypename(tmpResult);
 
-  //TODO: network memberships
+
 
   return interchangeRecord;
 
@@ -3753,7 +3752,7 @@ export function interchangeImage2StrapiImage(importImage) {
 export async function createEntityParents(childEntityID, parentsArray) {
 
 
-  let foundParents="none"
+  let foundParents = "none"
 
   let entityrelationID = "";
   let parentEntityID = "";
@@ -3762,69 +3761,69 @@ export async function createEntityParents(childEntityID, parentsArray) {
   let newParentEntityID = "";
   let currentParent = {};
 
-  
+
   for (let parentCounter in parentsArray) {
-      currentParent = parentsArray[parentCounter];      
-      entityrelationID = "";
-      parentEntityID = "";
-      entitytypeID = "";
-      updateParentEntityID = "";
-      newParentEntityID = "";
+    currentParent = parentsArray[parentCounter];
+    entityrelationID = "";
+    parentEntityID = "";
+    entitytypeID = "";
+    updateParentEntityID = "";
+    newParentEntityID = "";
 
-//TODO: handle if the entityParentIdName is invalid
-      entitytypeID = await getEntitytypeIDByIdName(currentParent.entitytypeIdName);
-      if (entitytypeID != "none") { //yes it exists - we can use it when connecting to a parent
+    //TODO: handle if the entityParentIdName is invalid
+    entitytypeID = await getEntitytypeIDByIdName(currentParent.entitytypeIdName);
+    if (entitytypeID != "none") { //yes it exists - we can use it when connecting to a parent
 
-          parentEntityID = await getEntityIDByIdName(currentParent.entityParentIdName);
-          if (parentEntityID != "none") { //yes it exists - we can connect it as parent
-              // now we have all 3 keys (childEntityID, entityTypeID, parentEntityID ) and we can create the parent relation. 
+      parentEntityID = await getEntityIDByIdName(currentParent.entityParentIdName);
+      if (parentEntityID != "none") { //yes it exists - we can connect it as parent
+        // now we have all 3 keys (childEntityID, entityTypeID, parentEntityID ) and we can create the parent relation. 
 
-              //but first we must check if it already exist
-              entityrelationID = await getEntityrelationIDByKeyIDs(childEntityID, entitytypeID, parentEntityID);
-              if (entityrelationID != "none") { //yes it exists - we can update it
-                  updateParentEntityID = await updateEntityrelationParent(entityrelationID, currentParent.displayName, currentParent.text);             
-                  if (updateParentEntityID != "none") { // we managed to update 
-                      let logText = "Updated createEntityParents. Parent is:" + currentParent.entityParentIdName + " (" + updateParentEntityID + ")";
-                      console.log(logText);
-                      foundParents="OK";
-                  } else {
-                      //trouble - could not create the answer
-                      let logText = "Error could not create createEntityParents. " + currentParent.entityParentIdName + " not set to parent";
-                      console.error(logText);
-                      debugger
-                  }
-
-              }
-              else {
-                  newParentEntityID = await createEntityrelationParent(childEntityID, entitytypeID, parentEntityID, currentParent.displayName, currentParent.text);
-                  if (newParentEntityID != "none") { // we managet to update an answer
-                      let logText = "Create createEntityParents. Parent is:" + currentParent.entityParentIdName + "(" + newParentEntityID + ")";
-                      console.log(logText);
-                      foundParents="OK";
-                  } else {
-                      //trouble - could not create the answer
-                      let logText = "Error could not create createEntityParents. " + currentParent.entityParentIdName + " not set to parent";
-                      console.error(logText);
-                      debugger
-                  }
-
-              }
-
+        //but first we must check if it already exist
+        entityrelationID = await getEntityrelationIDByKeyIDs(childEntityID, entitytypeID, parentEntityID);
+        if (entityrelationID != "none") { //yes it exists - we can update it
+          updateParentEntityID = await updateEntityrelationParent(entityrelationID, currentParent.displayName, currentParent.text);
+          if (updateParentEntityID != "none") { // we managed to update 
+            let logText = "Updated createEntityParents. Parent is:" + currentParent.entityParentIdName + " (" + updateParentEntityID + ")";
+            console.log(logText);
+            foundParents = "OK";
+          } else {
+            //trouble - could not create the answer
+            let logText = "Error could not create createEntityParents. " + currentParent.entityParentIdName + " not set to parent";
+            console.error(logText);
+            debugger
           }
-          else {
-              console.error("createEntityParents: entityParentIdName=", currentParent.entityParentIdName, " does notexist. Cant make it a parent")
-              debugger
+
+        }
+        else {
+          newParentEntityID = await createEntityrelationParent(childEntityID, entitytypeID, parentEntityID, currentParent.displayName, currentParent.text);
+          if (newParentEntityID != "none") { // we managet to update an answer
+            let logText = "Create createEntityParents. Parent is:" + currentParent.entityParentIdName + "(" + newParentEntityID + ")";
+            console.log(logText);
+            foundParents = "OK";
+          } else {
+            //trouble - could not create the answer
+            let logText = "Error could not create createEntityParents. " + currentParent.entityParentIdName + " not set to parent";
+            console.error(logText);
+            debugger
           }
+
+        }
+
       }
       else {
-          console.error("createEntityParents: entityParentIdName=", currentParent.entityParentIdName, " does notexist. Cant make it a parent")
-          debugger
+        console.error("createEntityParents: entityParentIdName=", currentParent.entityParentIdName, " does notexist. Cant make it a parent")
+        debugger
       }
+    }
+    else {
+      console.error("createEntityParents: entityParentIdName=", currentParent.entityParentIdName, " does notexist. Cant make it a parent")
+      debugger
+    }
 
 
   }
 
-return foundParents;
+  return foundParents;
 
 }
 
@@ -3841,9 +3840,9 @@ async function getEntityrelationIDByKeyIDs(childEntityID, entityTypeID, parentEn
   let ReturnID = "none"; //assume its not there
 
   const myVariables = {
-      "childEntityID": childEntityID,
-      "entityTypeID": entityTypeID,
-      "parentEntityID": parentEntityID
+    "childEntityID": childEntityID,
+    "entityTypeID": entityTypeID,
+    "parentEntityID": parentEntityID
   };
 
 
@@ -3852,20 +3851,20 @@ async function getEntityrelationIDByKeyIDs(childEntityID, entityTypeID, parentEn
   try {
 
     response = await apolloClient.query({
-          query: ENTITYRELATIONBYKEYIDS_QUERY,
-          variables: myVariables
-      });
+      query: ENTITYRELATIONBYKEYIDS_QUERY,
+      variables: myVariables
+    });
 
 
-      if (Array.isArray(response.data.entityrelations)) { // there is a result set
-          if (response.data.entityrelations.length > 0) {
-              ReturnID = response.data.entityrelations[0].id;
-          }
+    if (Array.isArray(response.data.entityrelations)) { // there is a result set
+      if (response.data.entityrelations.length > 0) {
+        ReturnID = response.data.entityrelations[0].id;
       }
+    }
 
   }
   catch (e) {
-      console.log("1.9 getEntityrelationIDByKeyIDs catch error ", JSON.stringify(e))
+    console.log("1.9 getEntityrelationIDByKeyIDs catch error ", JSON.stringify(e))
   }
 
   return ReturnID;
@@ -3879,34 +3878,34 @@ async function updateEntityrelationParent(entityrelationID, displayName, text) {
 
   let response;
   let ReturnID = "none"; //assume its not there
-  
+
   const myVariables = {
-      "entityrelationID": entityrelationID,
-      "displayName": displayName,
-      "text": text
+    "entityrelationID": entityrelationID,
+    "displayName": displayName,
+    "text": text
   };
-  
+
 
 
   try {
 
     response = await apolloClient.mutate({
-          mutation: ENTITYRELATIONPARENTUPDATE_MUTATION,
-          variables: myVariables
-      });
+      mutation: ENTITYRELATIONPARENTUPDATE_MUTATION,
+      variables: myVariables
+    });
 
 
-      if (null != response.data.updateEntityrelation) { // there is a result set
-          if (response.data.updateEntityrelation.entityrelation) {
-              ReturnID = response.data.updateEntityrelation.entityrelation.id;
-          } else
-              console.log("err updateEntityrelationParent no id:", JSON.stringify(result))
+    if (null != response.data.updateEntityrelation) { // there is a result set
+      if (response.data.updateEntityrelation.entityrelation) {
+        ReturnID = response.data.updateEntityrelation.entityrelation.id;
       } else
-          console.log("err updateEntityrelationParent:", JSON.stringify(result))
+        console.log("err updateEntityrelationParent no id:", JSON.stringify(result))
+    } else
+      console.log("err updateEntityrelationParent:", JSON.stringify(result))
   }
   catch (e) {
-      console.log("1.9 updateEntityrelationParent catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
-  } 
+    console.log("1.9 updateEntityrelationParent catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
+  }
 
   return ReturnID;
 };
@@ -3923,33 +3922,33 @@ async function createEntityrelationParent(childEntityID, entityTypeID, parentEnt
   let ReturnID = "none"; //assume its not there  
 
   const myVariables = {
-      "childEntityID": childEntityID,
-      "entityTypeID": entityTypeID,
-      "parentEntityID": parentEntityID,
-      "displayName": displayName,
-      "text": text
+    "childEntityID": childEntityID,
+    "entityTypeID": entityTypeID,
+    "parentEntityID": parentEntityID,
+    "displayName": displayName,
+    "text": text
   };
-  
+
 
 
   try {
 
     response = await apolloClient.mutate({
-          mutation: ENTITYRELATIONPARENTCREATE_MUTATION,
-          variables: myVariables
-      });
+      mutation: ENTITYRELATIONPARENTCREATE_MUTATION,
+      variables: myVariables
+    });
 
 
-      if (null != response.data.createEntityrelation) { // there is a result set
-          if (response.data.createEntityrelation.entityrelation) {
-              ReturnID = response.data.createEntityrelation.entityrelation.id;
-          } else
-              console.log("err createEntityrelationParent no id:", JSON.stringify(response))
+    if (null != response.data.createEntityrelation) { // there is a result set
+      if (response.data.createEntityrelation.entityrelation) {
+        ReturnID = response.data.createEntityrelation.entityrelation.id;
       } else
-          console.log("err createEntityrelationParent:", JSON.stringify(response))
+        console.log("err createEntityrelationParent no id:", JSON.stringify(response))
+    } else
+      console.log("err createEntityrelationParent:", JSON.stringify(response))
   }
   catch (e) {
-      console.log("1.9 createEntityrelationParent catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
+    console.log("1.9 createEntityrelationParent catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
   }
 
   return ReturnID;
@@ -3969,33 +3968,33 @@ export async function updateEntityCategoryAnswer(entityCategoryID, text, entityC
 
   let response;
   let ReturnID = "none"; //assume its not there
-   
+
   const myVariables = {
-      "entityCategoryAnswerID": entityCategoryID,
-      "answerText": entityCategoryAnswerText,
-      "text": text
+    "entityCategoryAnswerID": entityCategoryID,
+    "answerText": entityCategoryAnswerText,
+    "text": text
   };
 
 
   try {
-                     
+
     response = await apolloClient.mutate({
-          mutation: ENTITYCATEGORYANSWERUPDATE_MUTATION,
-          variables: myVariables
-      });
+      mutation: ENTITYCATEGORYANSWERUPDATE_MUTATION,
+      variables: myVariables
+    });
 
 
-      if (null != response.data.updateEntityCategoryAnswer) { // there is a result set
-          if (response.data.updateEntityCategoryAnswer.entityCategoryAnswer) {
-              ReturnID = response.data.updateEntityCategoryAnswer.entityCategoryAnswer.id;
-          } else
-              console.log("err updateEntityCategoryAnswer no id:", JSON.stringify(response))
+    if (null != response.data.updateEntityCategoryAnswer) { // there is a result set
+      if (response.data.updateEntityCategoryAnswer.entityCategoryAnswer) {
+        ReturnID = response.data.updateEntityCategoryAnswer.entityCategoryAnswer.id;
       } else
-          console.log("err updateEntityCategoryAnswer:", JSON.stringify(response))
+        console.log("err updateEntityCategoryAnswer no id:", JSON.stringify(response))
+    } else
+      console.log("err updateEntityCategoryAnswer:", JSON.stringify(response))
   }
   catch (e) {
-      console.log("1.9 updateEntityCategoryAnswer catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
-      debugger
+    console.log("1.9 updateEntityCategoryAnswer catch error ", JSON.stringify(e), " =>result is:", JSON.stringify(response), " =>myVariables is:", JSON.stringify(myVariables));
+    debugger
   }
 
   return ReturnID;
@@ -4003,3 +4002,170 @@ export async function updateEntityCategoryAnswer(entityCategoryID, text, entityC
 
 
 
+/** strapiNetworkMembersips2networkDomainArray 
+Takes a strapi formatted record like this:
+[
+  {
+    "__typename": "EntityNetworkMembership",
+    "network": {
+      "__typename": "Network",
+      "id": "9",
+      "idName": "urbalurba.no",
+      "displayName": "Urbalurba",
+      "image": null,
+      "internalImage": {
+        "__typename": "ComponentEntityInternalImage",
+        "profile": {
+          "__typename": "ComponentEntityImg",
+          "url": "https://storage.googleapis.com/bucket.urbalurba.com/logo/urbalurba.jpg"
+        }
+      }
+    }
+  },
+  {
+    "__typename": "EntityNetworkMembership",
+    "network": {
+      "__typename": "Network",
+      "id": "27",
+      "idName": "proptechinnovation.com",
+      "displayName": "Proptech Innovation",
+      "image": null,
+      "internalImage": {
+        "__typename": "ComponentEntityInternalImage",
+        "profile": {
+          "__typename": "ComponentEntityImg",
+          "url": "https://storage.googleapis.com/bucket.urbalurba.com/images/entity/proptechinnovation.com/proptechinnovation.com-profile.jpg"
+        }
+      }
+    }
+  },
+  {
+    "__typename": "EntityNetworkMembership",
+    "network": {
+      "__typename": "Network",
+      "id": "2",
+      "idName": "smartebyernorge.no",
+      "displayName": "Smarte Byer Norge",
+      "image": null,
+      "internalImage": {
+        "__typename": "ComponentEntityInternalImage",
+        "profile": {
+          "__typename": "ComponentEntityImg",
+          "url": "https://storage.googleapis.com/bucket.urbalurba.com/images/entity/smartebyernorge.no/smartebyernorge.no-profile.jpg"
+        }
+      }
+    }
+  }
+]
+and transforms it to:
+["urbalurba.no", "proptechinnovation.com", "smartebyernorge.no"]
+
+* if there are none a empty array will be returned.
+*/
+function strapiNetworkMembersips2networkDomainArray(strapiNetworkMembersipRecord) {
+
+  let networkDomainArray = [];
+
+  if (Array.isArray(strapiNetworkMembersipRecord)) { // and its an array  
+    for (let i = 0; i < strapiNetworkMembersipRecord.length; i++) { //looping all domains
+      networkDomainArray.push(strapiNetworkMembersipRecord[i].network.idName);
+    }
+  }
+
+  return networkDomainArray;
+}
+
+
+
+/** entity_categories2categoryAnswers
+ * takes the entity_categories array and returns an categoryAnswers array
+ 
+The result will be like this:
+[
+  {
+    "idName": "sector",
+    "displayName": "Sektor",
+    "answers": [
+      {
+        "text": "CatItem:private,Cat:sector,Org:kpmg.fi,Source:insightly",
+        "idName": "private",
+        "displayName": "Næringsliv"
+      }
+    ]
+  },
+  {
+    "idName": "sdg",
+    "displayName": "Sustainable Development Goals",
+    "answers": [
+      {
+        "text": "CatItem:11,Cat:sdg,Org:kpmg.fi,Source:insightly",
+        "idName": "11",
+        "displayName": "Bærekraftige byer og samfunn"
+      },
+      {
+        "text": "CatItem:17,Cat:sdg,Org:kpmg.fi,Source:insightly",
+        "idName": "17",
+        "displayName": "Samarbeid for å nå målene"
+      }
+    ]
+  },
+  {
+    "idName": "industry",
+    "displayName": "Virksomhetsområde",
+    "answers": [
+      {
+        "text": "CatItem:finance,Cat:industry,Org:kpmg.fi,Source:insightly",
+        "idName": "finance",
+        "displayName": "Bank og finans"
+      },
+      {
+        "text": "CatItem:consulting,Cat:industry,Org:kpmg.fi,Source:insightly",
+        "idName": "consulting",
+        "displayName": "Consulting"
+      }
+    ]
+  }
+]
+
+ */
+
+function entity_categories2categoryAnswers(entity_categories) {
+  let returnArray = [];
+  let categoryRecord = {};
+  let answerRecord = {};
+
+  // for all categories
+  for (let i = 0; i < entity_categories.length; i++) {
+    categoryRecord = {};
+    categoryRecord.idName = entity_categories[i].category.idName;
+    categoryRecord.displayName = entity_categories[i].category.displayName;
+    categoryRecord.answers = [];
+
+    // for all answers to the category
+    for (let j = 0; j < entity_categories[i].entity_category_answers.length; j++) {
+      answerRecord = {};
+      answerRecord.text = entity_categories[i].entity_category_answers[j].text;
+      answerRecord.idName = entity_categories[i].entity_category_answers[j].categoryitem.idName;
+      answerRecord.displayName = entity_categories[i].entity_category_answers[j].categoryitem.displayName;
+      categoryRecord.answers.push(answerRecord);
+    }
+
+    returnArray.push(categoryRecord);
+  }
+
+
+  return returnArray;
+}
+
+
+/** removeTypename
+ No idea why there is a "__typename" field 
+ This function removes it
+ */
+function removeTypename(inputRecord) {
+
+  let returnRecord;
+  returnRecord = JSON.parse(JSON.stringify(inputRecord));
+  delete returnRecord.__typename;
+  return returnRecord;
+}

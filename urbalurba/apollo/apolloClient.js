@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import fetch from 'cross-fetch';
+// using apollo from react vs node has some differences see my https://stackoverflow.com/questions/64428473/using-apollo-in-node-no-react
 import { ApolloClient, HttpLink, createHttpLink, InMemoryCache } from '@apollo/client';
 import { concatPagination } from '@apollo/client/utilities/utilities.cjs.js';
 import { STRAPIURI } from "../lib/strapidatalib.js";
