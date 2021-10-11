@@ -1,4 +1,3 @@
-
 /* lib functions for accessing algolia */
 import algoliasearch from 'algoliasearch';
 
@@ -59,7 +58,7 @@ export async function pushStrapi2algolia() {
             ],
             // Set up some attributes to filter results on
             attributesForFaceting: [
-                'networkMemberships', 'entitytype', 'categories', 'city', 'municipalityName', 'countyName', 'country'
+                'networkMemberships', 'entitytype', 'categories', 'city', 'municipalityName', 'countyName', 'country', 'employees', 
             ]
         });
 
@@ -173,6 +172,8 @@ function interchange2algoliaEntityRecord(interchangeRecord) {
 
     // organizationNumber
     algoliaRecord.organizationNumber = getNested(interchangeRecord, "brreg", "organizationNumber");
+    // empolyees
+    algoliaRecord.employees = Number(getNested(interchangeRecord, "brreg", "employees"));
     delete algoliaRecord.brreg;
 
 
