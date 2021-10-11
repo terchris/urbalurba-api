@@ -10,3 +10,4 @@ export * from "./urbalurba/lib/strapidatalib.js";
 export * from "./urbalurba/lib/urbalurbalib2.js";
 export * from "./urbalurba/lib/scrapelib.js";
 export * from "./urbalurba/lib/logger.js";
+export * from "./urbalurba/lib/githublib.js";
