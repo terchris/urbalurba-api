@@ -20,6 +20,7 @@
   "homepage": "https://github.com/terchris/urbalurba-api#readme",
   "dependencies": {
     "@apollo/client": "^3.4.16",
+    "@octokit/rest": "^18.12.0",
     "algoliasearch": "^4.10.5",
     "axios": "^0.22.0",
     "coralogix-logger-winston": "^1.0.11",
